@@ -1,0 +1,75 @@
+name: remotion-info
+description: 获取 PHP Remotion 项目信息和文档
+triggers:
+  - "项目信息"
+  - "project info"
+  - "帮助"
+  - "help"
+  - "使用说明"
+projectStructure:
+  src/:
+    Animation/: "动画核心模块"
+      Easing.php: "缓动函数（linear, ease, bounce, elastic 等）"
+      Interpolate.php: "数值和颜色插值"
+      Spring.php: "物理弹簧动画"
+    Core/: "核心组件"
+      Composition.php: "视频合成配置"
+      RenderContext.php: "渲染上下文"
+      Sequence.php: "时间序列组件"
+      Timeline.php: "时间线管理"
+      VideoConfig.php: "视频配置（fps, 分辨率等）"
+    Helpers/: "辅助工具"
+      Color.php: "颜色解析和转换"
+      Pipeline.php: "函数管道"
+    Layers/: "图层类型"
+      AbstractLayer.php: "图层基类"
+      ColorLayer.php: "纯色图层"
+      GradientLayer.php: "渐变图层"
+      ImageLayer.php: "图片图层"
+      TextLayer.php: "文字图层"
+    Rendering/: "渲染器"
+      AnimatedGifEncoder.php: "GIF 编码器"
+      Renderer.php: "主渲染器"
+availableExamples:
+  basic:
+    - name: fade-text
+      description: 淡入淡出文字动画
+      command: "php example.php fade-text"
+    - name: spring-scale
+      description: 弹簧缩放动画
+      command: "php example.php spring-scale"
+    - name: multi-sequence
+      description: 多序列组合动画
+      command: "php example.php multi-sequence"
+  advanced:
+    - name: rainbow-animation
+      description: 彩虹渐变动画
+      command: "php advanced-examples.php rainbow-animation"
+    - name: pulse-effect
+      description: 脉冲波纹效果
+      command: "php advanced-examples.php pulse-effect"
+    - name: typewriter
+      description: 打字机效果
+      command: "php advanced-examples.php typewriter"
+    - name: progress-bar
+      description: 进度条动画
+      command: "php advanced-examples.php progress-bar"
+    - name: slideshow
+      description: 图片轮播
+      command: "php advanced-examples.php slideshow"
+quickStart: |
+  1. 运行示例: php example.php fade-text
+  2. 创建动画: 添加新的 composition 到 example.php
+  3. 运行测试: ./vendor/bin/pest
+  4. 查看文档: cat README.md
+apiReference:
+  Remotion::composition(): "创建合成"
+  Remotion::sequence(): "创建序列"
+  Remotion::interpolate(): "数值插值"
+  Remotion::interpolateColors(): "颜色插值"
+  Remotion::spring(): "弹簧动画"
+  Remotion::createCanvas(): "创建画布"
+  RenderContext::getCurrentFrame(): "获取当前帧"
+  RenderContext::getVideoConfig(): "获取视频配置"
+  Easing::easeOut(): "缓出"
+  Easing::bounce(): "弹跳"

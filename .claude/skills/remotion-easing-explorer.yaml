@@ -1,0 +1,99 @@
+name: remotion-easing-explorer
+description: 探索和测试 Easing 缓动函数效果
+triggers:
+  - "缓动函数"
+  - "easing"
+  - "贝塞尔曲线"
+  - "测试缓动"
+parameters:
+  - name: easingType
+    type: string
+    required: false
+    description: 缓动函数类型
+    default: easeOut
+    options:
+      - linear
+      - ease
+      - easeIn
+      - easeOut
+      - easeInOut
+      - quad
+      - cubic
+      - sin
+      - circle
+      - exp
+      - bounce
+      - elastic
+      - back
+      - bezier
+  - name: bezierParams
+    type: string
+    required: false
+    description: 贝塞尔曲线参数 (x1,y1,x2,y2)，仅 bezier 类型使用
+    default: "0.25,0.1,0.25,1.0"
+easingFunctions:
+  linear: |
+    Easing::linear($t) - 线性，无缓动效果
+  ease: |
+    Easing::ease($t) - 标准缓动 (cubic-bezier(0.25, 0.1, 0.25, 1.0))
+  easeIn: |
+    Easing::easeIn($t) - 缓入 (cubic-bezier(0.42, 0, 1, 1))
+  easeOut: |
+    Easing::easeOut($t) - 缓出 (cubic-bezier(0, 0, 0.58, 1))
+  easeInOut: |
+    Easing::easeInOut($t) - 缓入缓出 (cubic-bezier(0.42, 0, 0.58, 1))
+  quad: |
+    Easing::quad($t) - 二次方缓入 (t^2)
+  cubic: |
+    Easing::cubic($t) - 三次方缓入 (t^3)
+  sin: |
+    Easing::sin($t) - 正弦缓动
+  circle: |
+    Easing::circle($t) - 圆形缓动
+  exp: |
+    Easing::exp($t) - 指数缓动
+  bounce: |
+    Easing::bounce($t) - 弹跳缓动
+  elastic: |
+    Easing::elastic($bounciness) - 弹性缓动
+  back: |
+    Easing::back($s) - 回弹效果
+  bezier: |
+    Easing::bezier($x1, $y1, $x2, $y2) - 自定义贝塞尔曲线
+codeTemplate: |
+  <?php
+  require_once __DIR__ . '/vendor/autoload.php';
+  
+  use Yangweijie\Remotion\Animation\Easing;
+  
+  // 测试 {easingType} 缓动函数
+  $easingType = '{easingType}';
+  
+  echo "Easing 函数测试: $easingType\n";
+  echo str_repeat('=', 50) . "\n\n";
+  
+  $values = [0, 0.25, 0.5, 0.75, 1.0];
+  
+  foreach ($values as $t) {
+      $result = match($easingType) {
+          'linear' => Easing::linear($t),
+          'ease' => Easing::ease($t),
+          'easeIn' => Easing::easeIn($t),
+          'easeOut' => Easing::easeOut($t),
+          'easeInOut' => Easing::easeInOut($t),
+          'quad' => Easing::quad($t),
+          'cubic' => Easing::cubic($t),
+          'sin' => Easing::sin($t),
+          'circle' => Easing::circle($t),
+          'exp' => Easing::exp($t),
+          'bounce' => Easing::bounce($t),
+          'elastic' => Easing::elastic(1.0)($t),
+          'back' => Easing::back(1.70158)($t),
+          'bezier' => Easing::bezier(0.25, 0.1, 0.25, 1.0)($t),
+          default => $t,
+      };
+      
+      $bar = str_repeat('█', (int) ($result * 20)) . str_repeat('░', 20 - (int) ($result * 20));
+      printf("t=%.2f | %s | %.4f\n", $t, $bar, $result);
+  }
+outputPath: "test-easing.php"

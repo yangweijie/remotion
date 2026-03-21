@@ -1,0 +1,24 @@
+name: remotion-render
+description: 渲染 PHP Remotion 动画为 GIF 文件
+triggers:
+  - "渲染动画"
+  - "render animation"
+  - "生成 gif"
+  - "渲染示例"
+parameters:
+  - name: compositionId
+    type: string
+    required: true
+    description: 合成 ID (fade-text, spring-scale, multi-sequence, rainbow-animation, pulse-effect, typewriter, progress-bar, slideshow)
+    default: spring-scale
+  - name: outputFile
+    type: string
+    required: false
+    description: 输出文件名
+    default: "{compositionId}.gif"
+examples:
+  - "渲染 spring-scale 动画"
+  - "生成 fade-text.gif"
+  - "渲染 progress-bar 示例"
+command: "php example.php {compositionId} {outputFile}"
+workingDirectory: "{{workspace}}"

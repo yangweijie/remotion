@@ -1,0 +1,79 @@
+name: remotion-new-test
+description: 为 PHP Remotion 创建新的单元测试
+triggers:
+  - "创建测试"
+  - "new test"
+  - "新建测试"
+  - "添加测试"
+parameters:
+  - name: module
+    type: string
+    required: true
+    description: 测试模块
+    options:
+      - Easing
+      - Interpolate
+      - Spring
+      - Color
+      - VideoConfig
+      - RenderContext
+      - Sequence
+  - name: testName
+    type: string
+    required: true
+    description: 测试名称（描述性）
+  - name: assertions
+    type: string
+    required: false
+    description: 断言类型
+    default: toBe
+    options:
+      - toBe
+      - toEqual
+      - toBeGreaterThan
+      - toBeLessThan
+      - toThrow
+      - toBeTrue
+      - toBeFalse
+      - toContain
+testTemplates:
+  Easing: |
+    it('{testName}', function () {{
+        $result = Easing::{functionName}();
+        expect($result)->{assertion}({expected});
+    }});
+  Interpolate: |
+    it('{testName}', function () {{
+        $result = Interpolate::{functionName}();
+        expect($result)->{assertion}({expected});
+    }});
+  Spring: |
+    it('{testName}', function () {{
+        $result = Spring::{functionName}();
+        expect($result)->{assertion}({expected});
+    }});
+  Color: |
+    it('{testName}', function () {{
+        $color = Color::{functionName}();
+        expect($color)->{assertion}({expected});
+    }});
+codeTemplate: |
+  <?php
+  
+  declare(strict_types=1);
+  
+  namespace Yangweijie\Remotion\Tests;
+  
+  use Yangweijie\Remotion\Animation\{module};
+  use PHPUnit\Framework\TestCase;
+  
+  uses(TestCase::class);
+  
+  describe('{module}', function () {{
+      it('{testName}', function () {{
+          // TODO: 编写测试逻辑
+          $this->assertTrue(true);
+      }});
+  }});
+outputPath: "tests/{module}Test.php"
+appendMode: true

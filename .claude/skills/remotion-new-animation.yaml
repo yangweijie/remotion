@@ -1,0 +1,68 @@
+name: remotion-new-animation
+description: 创建新的 PHP Remotion 动画组件
+triggers:
+  - "创建动画"
+  - "new animation"
+  - "新建动画"
+  - "添加动画"
+parameters:
+  - name: name
+    type: string
+    required: true
+    description: 动画名称 (camelCase)
+  - name: type
+    type: string
+    required: false
+    description: 动画类型
+    default: basic
+    options:
+      - basic
+      - sequence
+      - spring
+      - text
+parametersSchema:
+  type: object
+  properties:
+    name:
+      type: string
+      pattern: "^[a-z][a-zA-Z0-9]*$"
+      description: 动画名称，使用 camelCase 格式
+    type:
+      type: string
+      enum: [basic, sequence, spring, text]
+      description: 动画类型
+template: |
+  <?php
+  
+  /**
+   * {{name}} 动画组件
+   */
+  
+  ${{name}}Comp = Remotion::composition(
+      id: '{{name}}',
+      renderer: function (RenderContext $ctx): \GdImage {
+          $frame  = $ctx->getCurrentFrame();
+          $config = $ctx->getVideoConfig();
+          
+          $canvas = Remotion::createCanvas($config->width, $config->height, [20, 20, 50]);
+          
+          // TODO: 添加你的动画逻辑
+          
+          return $canvas;
+      },
+      durationInFrames: 60,
+      fps: 30,
+      width: 640,
+      height: 360,
+  );
+  
+  // 注册到 Remotion
+  Remotion::registerRoot([${{name}}Comp]);
+  
+  // 渲染
+  if (php_sapi_name() === 'cli' && isset($argv[0]) && realpath($argv[0]) === __FILE__) {
+      $renderer = Remotion::render(${{name}}Comp);
+      $renderer->onProgress(fn($f, $t) => print("  Progress: " . round($f/$t*100) . "%\n"));
+      $renderer->renderToGif('{{name}}.gif');
+  }
+outputPath: "examples/{name}.php"

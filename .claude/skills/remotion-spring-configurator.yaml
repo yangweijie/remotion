@@ -1,0 +1,91 @@
+name: remotion-spring-configurator
+description: 配置和预览弹簧动画参数
+triggers:
+  - "弹簧动画"
+  - "spring"
+  - "弹性效果"
+  - "阻尼动画"
+parameters:
+  - name: stiffness
+    type: number
+    required: false
+    description: 刚度 (stiffness)
+    default: 100
+    min: 10
+    max: 500
+  - name: damping
+    type: number
+    required: false
+    description: 阻尼 (damping)
+    default: 10
+    min: 1
+    max: 50
+  - name: mass
+    type: number
+    required: false
+    description: 质量 (mass)
+    default: 1
+    min: 0.1
+    max: 5
+  - name: from
+    type: number
+    required: false
+    description: 起始值
+    default: 0
+  - name: to
+    type: number
+    required: false
+    description: 目标值
+    default: 1
+springPresets:
+  gentle: |
+    stiffness: 50, damping: 15, mass: 1
+    效果：平滑柔和的过渡
+  snappy: |
+    stiffness: 200, damping: 20, mass: 1
+    效果：快速响应的弹性
+  bouncy: |
+    stiffness: 100, damping: 10, mass: 1
+    效果：明显的弹跳效果
+  stiff: |
+    stiffness: 300, damping: 25, mass: 1
+    效果：快速且稳定的到达
+codeTemplate: |
+  <?php
+  require_once __DIR__ . '/vendor/autoload.php';
+  
+  use Yangweijie\Remotion\Animation\Spring;
+  
+  $config = [
+      'stiffness' => {stiffness},
+      'damping' => {damping},
+      'mass' => {mass},
+      'from' => {from},
+      'to' => {to},
+  ];
+  
+  echo "弹簧动画配置\n";
+  echo str_repeat('=', 50) . "\n";
+  echo "stiffness: {$config['stiffness']}\n";
+  echo "damping: {$config['damping']}\n";
+  echo "mass: {$config['mass']}\n";
+  echo "from: {$config['from']}\n";
+  echo "to: {$config['to']}\n";
+  echo str_repeat('=', 50) . "\n\n";
+  
+  echo "帧 | 值 | 可视化\n";
+  echo str_repeat('-', 50) . "\n";
+  
+  $maxValue = $config['to'] - $config['from'];
+  $amplitude = max(abs($maxValue), 0.1);
+  
+  for ($frame = 0; $frame <= 60; $frame += 5) {
+      $value = Spring::spring($frame, 30, $config);
+      $normalized = ($value - $config['from']) / $amplitude;
+      $bar = str_repeat('█', (int) ($normalized * 30)) . str_repeat('░', 30 - (int) ($normalized * 30));
+      printf("%3d | %.4f | %s\n", $frame, $value, $bar);
+  }
+  
+  echo "\n稳定帧数: " . Spring::getSettledFrame(30, $config) . "\n";
+  echo "是否已稳定 (frame=60): " . (Spring::isSettled(60, 30, $config) ? '是' : '否') . "\n";
+outputPath: "test-spring.php"

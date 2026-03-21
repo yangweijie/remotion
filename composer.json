@@ -1,0 +1,46 @@
+{
+    "name": "yangweijie/remotion",
+    "description": "php port of remotion - programmatic video/animation composition library",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Yangweijie\\Remotion\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Yangweijie\\Remotion\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "yangweijie",
+            "email": "917647288@qq.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "kosinix/grafika": "^2.0",
+        "sybio/gif-creator": "^1.0",
+        "minicli/minicli": "^4.2",
+        "php-standard-library/php-standard-library": "^6.1"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "bin": [
+        "bin/remotion"
+    ],
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "pestphp/pest": "^4.4"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}

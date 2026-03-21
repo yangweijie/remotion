@@ -1,0 +1,28 @@
+#!/usr/bin/env php
+<?php
+
+// 查找 autoload.php
+$autoloadPaths = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../vendor/autoload.php',
+    __DIR__ . '/../../../vendor/autoload.php',
+];
+
+$autoloaded = false;
+foreach ($autoloadPaths as $path) {
+    if (file_exists($path)) {
+        require_once $path;
+        $autoloaded = true;
+        break;
+    }
+}
+
+if (!$autoloaded) {
+    fwrite(STDERR, "Error: composer autoload not found. Run 'composer install' first.\n");
+    exit(1);
+}
+
+use Yangweijie\Remotion\CLI\RemotionCLI;
+
+$cli = new RemotionCLI();
+$cli->run($argv);
