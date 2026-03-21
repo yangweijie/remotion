@@ -1,9 +1,0 @@
-parameters:
-
-    level: 9
-
-    paths:
-        - src/
-
-    universalObjectCratesClasses:
-        - Minicli\Config
