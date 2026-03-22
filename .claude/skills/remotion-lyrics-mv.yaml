@@ -1,0 +1,185 @@
+---
+name: remotion-lyrics-mv
+description: PHP Remotion 歌词动画生成器 - 从LRC歌词生成MV视频
+author: auto-generated
+version: 1.0.0
+generated: 2026-03-22
+---
+
+# 歌词动画生成器 Skill
+
+## 快速开始
+
+### 基础用法
+
+```bash
+# 使用轻量整合版（性能最佳）
+php examples/lyrics-animation-optimized.php
+
+# 使用CLI版本（最灵活）
+php examples/lyrics-animation-cli.php \
+  --cover=封面.jpg \
+  --lyrics=歌词.lrc \
+  --audio=音频.mp3
+```
+
+### 完整参数示例
+
+```bash
+php examples/lyrics-animation-cli.php \
+  --cover="愿你能记住这个夜晚-马乙.jpg" \
+  --lyrics="愿你能记住这个夜晚-马乙.lrc" \
+  --audio="愿你能记住这个夜晚-马乙.mp3" \
+  --title="愿你能记住这个夜晚" \
+  --artist="马乙" \
+  --width=640 \
+  --height=360 \
+  --fps=10 \
+  --output="output/mv.mp4"
+```
+
+---
+
+## 文件命名规范
+
+CLI工具支持自动解析歌名和歌手：
+
+| 文件名格式 | 解析结果 |
+|-----------|---------|
+| `歌名-歌手.jpg` | title=歌名, artist=歌手 |
+| `歌名_歌手.jpg` | title=歌名, artist=歌手 |
+| `song.mp3` | title=song, artist=未知歌手 |
+
+---
+
+## 性能对比
+
+| 版本 | 总耗时 | GIF生成 | 特点 |
+|------|--------|---------|------|
+| 原生PHP | 4.3秒 | 1.9秒 | 最快，无依赖 |
+| 轻量整合 | 4.6秒 | 0.14秒 | 使用Remotion工具类 |
+| 深度重构 | 166秒 | 164秒 | 逐帧渲染，支持动画 |
+| CLI工具 | 4.5秒 | 1.7秒 | 参数化，最灵活 |
+
+**推荐：轻量整合版或CLI工具**
+
+---
+
+## 视觉风格配置
+
+### 复古怀旧风格（默认）
+
+```php
+$config = [
+    'width' => 640,
+    'height' => 360,
+    'fps' => 10,
+    'style' => 'vintage',
+    'primaryColor' => '#FF8C42',  // 暖橙色
+    'textColor' => '#C00000',      // 红色
+    'blurRadius' => 8,
+    'overlayColor' => [40, 30, 20, 60],  // 深棕遮罩
+    'fontSize' => 48,
+];
+```
+
+### 现代简约风格
+
+```php
+$config = [
+    'style' => 'modern',
+    'primaryColor' => '#FFFFFF',
+    'textColor' => '#FFFFFF',
+    'blurRadius' => 15,
+    'overlayColor' => [0, 0, 0, 100],  // 黑色遮罩
+    'fontSize' => 42,
+];
+```
+
+---
+
+## LRC歌词格式
+
+支持标准LRC格式：
+
+```
+[ti:歌曲名]
+[ar:歌手]
+[00:16.54]散场时能否留下来
+[00:18.00]角落里的红裙姑娘
+[00:25.25]我会为你点杯高大师啤酒
+```
+
+**自动过滤：**
+- 元数据标签（[ti:], [ar:]等）
+- 作词、作曲、编曲等 credits
+
+---
+
+## 视频帧分析流程
+
+### 1. 提取参考帧
+
+```bash
+ffmpeg -i "参考视频.mp4" -ss 00:00:01 -vframes 1 frame1.jpg
+ffmpeg -i "参考视频.mp4" -ss 00:01:30 -vframes 1 frame2.jpg
+ffmpeg -i "参考视频.mp4" -ss 00:03:00 -vframes 1 frame3.jpg
+```
+
+### 2. 使用提示词分析
+
+读取 `prompts/quick-analysis-prompt.md`，将提示词内容与帧图片一起发送给AI。
+
+### 3. 应用分析结果
+
+AI会输出YAML格式配置：
+
+```yaml
+风格: 复古怀旧
+主色调: 暖橙色(#FF8C42)
+背景处理: 中度模糊(5-8px) + 暗角遮罩
+字幕: 底部居中 | 红色(#C00000) | 投影阴影
+字体建议: 36-48px
+```
+
+---
+
+## 常见问题
+
+**Q: 歌词显示乱码？**
+- 确保使用支持中文的TTF字体
+- 默认使用 `/Library/Fonts/WenQuanWeiMiHei-1.ttf`
+- 可指定 `--font` 参数使用其他字体
+
+**Q: 歌词超出画面？**
+- 脚本会自动调整字体大小
+- 超长歌词会智能换行
+- 支持2-3行歌词显示
+
+**Q: GIF文件太大？**
+- 降低分辨率：--width=480 --height=270
+- 降低帧率：--fps=5
+- 使用流式编码（已默认优化）
+
+**Q: 视频生成失败？**
+- 确保安装了FFmpeg
+- 检查音频文件格式（推荐MP3）
+- 查看output目录权限
+
+---
+
+## 目录结构
+
+```
+examples/
+├── lyrics-animation-optimized.php    # 轻量整合版（推荐）
+├── lyrics-animation-remotion.php     # 深度重构版
+└── lyrics-animation-cli.php          # CLI工具
+
+prompts/
+├── quick-analysis-prompt.md          # 快速分析提示词
+└── video-analysis-prompt.md          # 详细分析提示词
+
+output/
+└── [生成的GIF和MP4文件]
+```

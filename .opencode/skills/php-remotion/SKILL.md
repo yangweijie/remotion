@@ -347,6 +347,69 @@ $newComp = Remotion::composition(
 Remotion::registerRoot([$newComp]);
 ```
 
+## 示例项目
+
+### 歌词动画生成器 (Lyrics MV Generator)
+
+位于 `examples/` 目录，展示如何使用 PHP Remotion 生成歌词MV视频。
+
+**可用版本：**
+
+| 版本 | 策略 | 性能 | 特点 |
+|------|------|------|------|
+| `lyrics-animation-optimized.php` | 轻量整合 | 4.6秒 | 使用Remotion配置+Easing |
+| `lyrics-animation-remotion.php` | 深度重构 | 166秒 | 逐帧渲染，支持动画 |
+| `lyrics-animation-cli.php` | CLI工具 | 4.5秒 | 支持命令行参数和LRC解析 |
+
+**快速使用：**
+
+```bash
+# 轻量整合版
+php examples/lyrics-animation-optimized.php
+
+# CLI版本（支持自定义参数）
+php examples/lyrics-animation-cli.php \
+  --cover=song.jpg \
+  --lyrics=song.lrc \
+  --audio=song.mp3 \
+  --title="歌名" \
+  --artist="歌手"
+```
+
+**CLI参数：**
+- `--cover` - 封面图片路径（必需）
+- `--lyrics` - LRC歌词文件路径（必需）
+- `--audio` - 音频文件路径（必需）
+- `--output` - 输出视频路径（可选）
+- `--title` - 歌曲名（可选）
+- `--artist` - 歌手名（可选）
+- `--width` - 视频宽度（默认640）
+- `--height` - 视频高度（默认360）
+- `--fps` - 帧率（默认10）
+
+### 视频帧分析提示词
+
+位于 `prompts/` 目录，用于AI分析参考视频风格。
+
+**提示词文件：**
+- `quick-analysis-prompt.md` - 快速分析（YAML输出）
+- `video-analysis-prompt.md` - 详细分析（JSON输出）
+
+**使用流程：**
+
+1. **提取视频帧**
+```bash
+ffmpeg -i video.mp4 -ss 00:00:01 -vframes 1 frame1.jpg
+ffmpeg -i video.mp4 -ss 00:01:30 -vframes 1 frame2.jpg
+ffmpeg -i video.mp4 -ss 00:03:00 -vframes 1 frame3.jpg
+```
+
+2. **使用提示词分析**
+读取 `prompts/quick-analysis-prompt.md`，将提示词内容与帧图片一起发送给AI。
+
+3. **获取PHP Remotion配置**
+AI会输出可直接使用的颜色代码和参数配置。
+
 ## 分析已有视频风格来创建mv
 
 如果模型支持视频解析，就用模型分析视频的结果，如果不支持，通过ffmpeg 截取 起始帧 10秒 30秒 关键帧图片 发送给模型来分析

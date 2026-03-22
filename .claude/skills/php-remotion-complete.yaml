@@ -403,6 +403,80 @@ php -d memory_limit=512M example.php fade-text
 
 ---
 
+## 示例项目
+
+### 歌词动画生成器
+
+位于 `examples/` 目录，展示如何使用 PHP Remotion 生成歌词MV。
+
+**版本对比：**
+
+| 版本 | 策略 | 性能 | 特点 |
+|------|------|------|------|
+| `lyrics-animation-v3.php` | 原生PHP | 最快(4.3s) | 关键帧+GIF delay优化 |
+| `lyrics-animation-optimized.php` | 轻量整合 | 接近原生(4.6s) | 使用Remotion配置+Easing |
+| `lyrics-animation-remotion.php` | 深度重构 | 较慢(166s) | 完全使用Remotion API |
+| `lyrics-animation-cli.php` | CLI工具 | 接近原生 | 支持命令行参数和LRC解析 |
+
+**快速使用：**
+
+```bash
+# 轻量整合版（推荐）
+php examples/lyrics-animation-optimized.php
+
+# CLI版本（支持自定义参数）
+php examples/lyrics-animation-cli.php \
+  --cover=song.jpg \
+  --lyrics=song.lrc \
+  --audio=song.mp3 \
+  --title="歌名" \
+  --artist="歌手"
+```
+
+**CLI参数：**
+- `--cover` - 封面图片路径（必需）
+- `--lyrics` - LRC歌词文件路径（必需）
+- `--audio` - 音频文件路径（必需）
+- `--output` - 输出视频路径（可选）
+- `--title` - 歌曲名（可选）
+- `--artist` - 歌手名（可选）
+- `--width` - 视频宽度（默认640）
+- `--height` - 视频高度（默认360）
+- `--fps` - 帧率（默认10）
+
+---
+
+## 视频帧分析提示词
+
+位于 `prompts/` 目录，用于AI分析参考视频风格。
+
+**提示词文件：**
+- `quick-analysis-prompt.md` - 快速分析（YAML输出）
+- `video-analysis-prompt.md` - 详细分析（JSON输出）
+
+**使用示例：**
+
+```bash
+# 1. 提取视频帧
+ffmpeg -i video.mp4 -ss 00:00:01 -vframes 1 frame1.jpg
+ffmpeg -i video.mp4 -ss 00:01:30 -vframes 1 frame2.jpg
+ffmpeg -i video.mp4 -ss 00:03:00 -vframes 1 frame3.jpg
+
+# 2. 使用提示词分析帧图片
+# 将提示词内容+图片发送给AI模型
+
+# 3. 获取PHP Remotion配置
+# AI会输出可直接使用的颜色代码和参数
+```
+
+**分析维度：**
+1. **色调氛围** - 整体色调、饱和度、特殊滤镜
+2. **背景处理** - 模糊程度、暗角、遮罩
+3. **字幕特征** - 位置、大小、颜色、特效
+4. **动态线索** - 背景动画、转场效果
+
+---
+
 ## 参考资料
 
 - [Remotion 官方文档](https://www.remotion.dev/docs)
