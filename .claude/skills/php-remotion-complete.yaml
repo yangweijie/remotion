@@ -1,0 +1,410 @@
+---
+name: php-remotion-complete
+description: PHP Remotion 完整开发技能 - 程序化视频/动画合成库，支持 GIF 渲染、缓动动画、弹簧物理效果、内存优化
+author: auto-generated
+version: 2.0.0
+generated: 2026-03-22
+---
+
+# PHP Remotion 开发技能
+
+## 项目简介
+
+PHP Remotion 是将 JavaScript Remotion 核心概念移植到 PHP 的程序化视频/动画合成库。使用纯 PHP 代码创建 GIF 动画。
+
+**核心能力:**
+- 程序化动画合成
+- GIF 渲染输出（内存优化 92%+）
+- 时间序列管理
+- 数值/颜色插值
+- 物理弹簧动画
+- 丰富的缓动函数
+- Grafika 图像处理支持
+
+---
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+composer install
+```
+
+### 2. 运行示例
+
+```bash
+# 淡入淡出文字动画
+php example.php fade-text
+
+# 弹簧缩放动画
+php example.php spring-scale
+
+# 多序列组合
+php example.php multi-sequence
+
+# 高级示例
+php advanced-examples.php rainbow-animation
+```
+
+### 3. 运行测试
+
+```bash
+./vendor/bin/pest
+```
+
+---
+
+## 核心 API
+
+### Remotion 门面类
+
+```php
+use Yangweijie\Remotion\Remotion;
+use Yangweijie\Remotion\Core\RenderContext;
+
+// 创建合成
+$comp = Remotion::composition(
+    id: 'my-animation',
+    renderer: function (RenderContext $ctx): \GdImage {
+        $frame = $ctx->getCurrentFrame();
+        $config = $ctx->getVideoConfig();
+        // 渲染逻辑
+        return $canvas;
+    },
+    durationInFrames: 60,
+    fps: 30,
+    width: 640,
+    height: 360,
+);
+
+// 渲染为 GIF
+Remotion::render($comp)->renderToGif('output.gif');
+
+// 内存优化渲染（推荐长视频）
+Remotion::render($comp)->renderToGifStreaming('output.gif');  // 流式编码，内存节省 92%
+Remotion::render($comp)->renderToGifOptimized('output.gif');  // gifsicle 压缩
+```
+
+### 动画工具
+
+```php
+use Yangweijie\Remotion\Animation\Easing;
+use Yangweijie\Remotion\Animation\Interpolate;
+use Yangweijie\Remotion\Animation\Spring;
+
+// 数值插值
+$value = Remotion::interpolate($frame, [0, 30], [0, 100], [
+    'easing' => Easing::easeOut(...),
+    'extrapolateLeft' => 'clamp',
+]);
+
+// 颜色插值
+$color = Remotion::interpolateColors($frame, [0, 30], [
+    [255, 0, 0], [0, 0, 255]
+]);
+
+// 弹簧动画
+$scale = Remotion::spring($frame, $fps, [
+    'stiffness' => 100,
+    'damping' => 12,
+    'from' => 0.3,
+    'to' => 1.0,
+]);
+```
+
+### 图层系统
+
+```php
+// 纯色图层
+$colorLayer = Remotion::colorLayer($width, $height, 255, 0, 0);
+
+// 渐变图层
+$gradient = Remotion::gradientLayer(
+    $width, $height,
+    ['r' => 255, 'g' => 0, 'b' => 0],
+    ['r' => 0, 'g' => 0, 'b' => 255],
+    'vertical'
+);
+
+// 文字图层
+$text = Remotion::textLayer('Hello World!', [
+    'fontSize' => 5,
+    'r' => 255, 'g' => 255, 'b' => 255,
+    'align' => 'center',
+]);
+
+// 图片图层
+$image = Remotion::imageLayer('/path/to/image.png');
+```
+
+### 序列 (Sequence)
+
+```php
+$seq = Remotion::sequence(
+    id: 'intro',
+    renderer: function (RenderContext $ctx): \GdImage {
+        $localFrame = $ctx->getCurrentFrame();
+        // 渲染逻辑，frame 从 0 开始
+        return $canvas;
+    },
+    from: 0,
+    durationInFrames: 30,
+);
+
+// 渲染序列
+$seqImage = $seq->render($globalCtx, $config);
+if ($seqImage !== null) {
+    imagecopy($canvas, $seqImage, 0, 0, 0, 0, $width, $height);
+    imagedestroy($seqImage);
+}
+```
+
+---
+
+## CLI 命令
+
+### 基础命令
+
+```bash
+# 查看帮助
+php bin/remotion help
+
+# 列出所有合成
+php bin/remotion list --root=example.php
+
+# 查看合成详情
+php bin/remotion info <compositionId> --root=example.php
+
+# 渲染 GIF
+php bin/remotion render <compositionId> --output=output.gif --root=example.php
+
+# 渲染为图片序列
+php bin/remotion render-frames <compositionId> --dir=frames/ --format=png --root=example.php
+```
+
+---
+
+## 项目结构
+
+```
+src/
+├── Remotion.php              # 主门面类
+├── helpers.php               # 辅助函数
+├── Animation/
+│   ├── Easing.php            # 缓动函数 (linear, ease, bounce, elastic)
+│   ├── Interpolate.php       # 数值/颜色插值
+│   └── Spring.php            # 物理弹簧动画
+├── CLI/
+│   └── RemotionCLI.php       # 命令行工具
+├── Contracts/                # 接口定义
+├── Core/
+│   ├── Composition.php       # 视频合成
+│   ├── RenderContext.php     # 渲染上下文
+│   ├── Sequence.php          # 时间序列
+│   ├── Timeline.php          # 时间线
+│   └── VideoConfig.php       # 视频配置
+├── Helpers/
+│   ├── Color.php             # 颜色处理
+│   └── Pipeline.php          # 管道工具
+├── Layers/
+│   ├── AbstractLayer.php     # 图层基类
+│   ├── ColorLayer.php        # 纯色图层
+│   ├── GradientLayer.php     # 渐变图层
+│   ├── ImageLayer.php        # 图片图层
+│   └── TextLayer.php         # 文字图层
+└── Rendering/
+    ├── AnimatedGifEncoder.php # GIF 编码器
+    └── Renderer.php           # 主渲染器
+```
+
+---
+
+## 缓动函数参考
+
+```php
+use Yangweijie\Remotion\Animation\Easing;
+
+// 基础缓动
+Easing::linear($t);
+Easing::ease($t);
+Easing::easeIn($t);
+Easing::easeOut($t);
+Easing::easeInOut($t);
+
+// 数学缓动
+Easing::quad($t);
+Easing::cubic($t);
+Easing::sin($t);
+Easing::circle($t);
+Easing::exp($t);
+
+// 弹性效果
+Easing::bounce($t);
+$elastic = Easing::elastic(1.0);
+$back = Easing::back(1.70158);
+
+// 贝塞尔曲线
+$bezier = Easing::bezier(0.25, 0.1, 0.25, 1.0);
+```
+
+---
+
+## 可用示例列表
+
+### 基础示例 (example.php)
+
+| 示例 | 命令 | 描述 |
+|------|------|------|
+| fade-text | `php example.php fade-text` | 淡入淡出文字动画 |
+| spring-scale | `php example.php spring-scale` | 弹簧缩放动画 |
+| multi-sequence | `php example.php multi-sequence` | 多序列组合动画 |
+
+### 高级示例 (advanced-examples.php)
+
+| 示例 | 命令 | 描述 |
+|------|------|------|
+| rainbow-animation | `php advanced-examples.php rainbow-animation` | 彩虹渐变动画 |
+| pulse-effect | `php advanced-examples.php pulse-effect` | 脉冲波纹效果 |
+| typewriter | `php advanced-examples.php typewriter` | 打字机效果 |
+| progress-bar | `php advanced-examples.php progress-bar` | 进度条动画 |
+| slideshow | `php advanced-examples.php slideshow` | 图片轮播 |
+
+---
+
+## 开发工作流
+
+### 1. 创建新动画
+
+```php
+// 在 example.php 中添加
+$newComp = Remotion::composition(
+    id: 'my-new-animation',
+    renderer: function (RenderContext $ctx): \GdImage {
+        $frame = $ctx->getCurrentFrame();
+        $config = $ctx->getVideoConfig();
+        
+        $canvas = Remotion::createCanvas($config->width, $config->height, [20, 20, 50]);
+        
+        // 你的动画逻辑
+        
+        return $canvas;
+    },
+    durationInFrames: 60,
+    fps: 30,
+    width: 640,
+    height: 360,
+);
+```
+
+### 2. 注册合成
+
+```php
+Remotion::registerRoot([$newComp]);
+```
+
+### 3. 渲染测试
+
+```bash
+php example.php my-new-animation
+```
+
+---
+
+## 测试
+
+```bash
+# 运行所有测试
+./vendor/bin/pest
+
+# 运行特定测试组
+./vendor/bin/pest --group=easing
+./vendor/bin/pest --group=spring
+./vendor/bin/pest --group=interpolate
+
+# 生成覆盖率报告
+./vendor/bin/pest --coverage
+
+# 静态分析
+./vendor/bin/phpstan analyse
+```
+
+### 测试覆盖模块
+
+- Easing (16 个测试)
+- Interpolate (11 个测试)
+- Spring (10 个测试)
+- Color (20 个测试)
+- VideoConfig (14 个测试)
+- RenderContext (10 个测试)
+- Sequence (12 个测试)
+
+---
+
+## 技术栈
+
+- **PHP**: >= 8.0
+- **图像处理**: GD 库 + Grafika (支持 GD/Imagick)
+- **依赖库**:
+  - `kosinix/grafika`: 图像处理抽象层
+  - `sybio/gif-creator`: GIF 生成
+  - `minicli/minicli`: CLI 框架
+  - `php-standard-library/psl`: PSL 标准库
+- **测试**: Pest PHP (123 个测试)
+- **静态分析**: PHPStan
+
+---
+
+## GIF 渲染方式对比
+
+| 方式 | 内存占用 | 文件大小 | 适用场景 |
+|------|---------|---------|---------|
+| `renderToGif()` | 741 MB | 13.7 MB | 短视频 <60帧 |
+| `renderToGifStreaming()` | **57.8 MB** | 1.2 MB | 内存敏感场景 |
+| `renderToGifOptimized()` | **49 MB** | 9.3 MB | 最小文件体积 |
+
+**内存节省：92%+**
+
+```php
+// 流式编码 - 最低内存
+$renderer->renderToGifStreaming('output.gif');
+
+// 优化压缩 - 最小文件
+$renderer->renderToGifOptimized('output.gif', [], [
+    'lossy' => 50,     // 有损压缩
+    'colors' => 64,    // 减少颜色
+    'optimize' => 3,   // 最高优化
+]);
+```
+
+---
+
+## 故障排除
+
+### 常见问题
+
+**Q: 渲染时出现内存不足错误**
+```bash
+# 增加 PHP 内存限制
+php -d memory_limit=512M example.php fade-text
+```
+
+**Q: 中文字符显示为方块**
+```bash
+# 需要使用支持中文的 TTF 字体
+# 修改 TextLayer 使用 imagettftext 替代 imagestring
+```
+
+**Q: GIF 文件过大**
+```bash
+# 降低帧率或减少颜色数
+# 在 Renderer 中调整质量参数
+```
+
+---
+
+## 参考资料
+
+- [Remotion 官方文档](https://www.remotion.dev/docs)
+- [PHP GD 文档](https://www.php.net/manual/en/book.image.php)
+- [Pest PHP 测试框架](https://pestphp.com/)

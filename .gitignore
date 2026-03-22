@@ -1,2 +1,5 @@
 *.gif
 /vendor
+frames_lyrics
+.phpunit.cache
+composer.lock

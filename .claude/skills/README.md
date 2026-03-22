@@ -6,6 +6,7 @@
 
 | Skill | 描述 | 触发词 |
 |-------|------|--------|
+| [php-remotion-complete.yaml](php-remotion-complete.yaml) | **完整开发技能** (推荐) | remotion、php remotion |
 | [remotion-info.yaml](remotion-info.yaml) | 项目信息和文档 | 项目信息、help、帮助 |
 | [remotion-render.yaml](remotion-render.yaml) | 渲染动画为 GIF | 渲染动画、render |
 | [remotion-test.yaml](remotion-test.yaml) | 运行单元测试 | 运行测试、pest |

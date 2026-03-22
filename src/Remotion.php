@@ -13,12 +13,18 @@ use Yangweijie\Remotion\Core\Sequence;
 use Yangweijie\Remotion\Core\Timeline;
 use Yangweijie\Remotion\Core\VideoConfig;
 use Yangweijie\Remotion\Helpers\Color;
+use Yangweijie\Remotion\Helpers\Noise;
 use Yangweijie\Remotion\Helpers\Pipeline;
+use Yangweijie\Remotion\Helpers\Random;
 use Yangweijie\Remotion\Layers\ColorLayer;
 use Yangweijie\Remotion\Layers\GradientLayer;
 use Yangweijie\Remotion\Layers\ImageLayer;
 use Yangweijie\Remotion\Layers\TextLayer;
+use Yangweijie\Remotion\Media\Audio;
+use Yangweijie\Remotion\Media\Video;
 use Yangweijie\Remotion\Rendering\Renderer;
+use Yangweijie\Remotion\Transitions\FadeTransition;
+use Yangweijie\Remotion\Transitions\SlideTransition;
 
 /**
  * Remotion
@@ -122,6 +128,54 @@ class Remotion
         string $name = '',
     ): Sequence {
         return Sequence::make($id, \Closure::fromCallable($renderer), $from, $durationInFrames, $name);
+    }
+
+    /**
+     * 创建 Loop 组件
+     *
+     * 循环播放子组件指定次数。
+     *
+     * @param callable $renderer 渲染函数
+     * @param int $durationInFrames 单次循环的帧数
+     * @param int $times 循环次数
+     * @param int|null $from 起始帧偏移
+     */
+    public static function loop(
+        callable $renderer,
+        int $durationInFrames,
+        int $times = 1,
+        ?int $from = 0,
+    ): Core\Loop {
+        return Core\Loop::make(\Closure::fromCallable($renderer), $durationInFrames, $times, $from);
+    }
+
+    /**
+     * 创建 Series 组件
+     *
+     * 自动排列多个序列。
+     */
+    public static function series(): Core\Series
+    {
+        return Core\Series::make();
+    }
+
+    /**
+     * 创建 Freeze 组件
+     *
+     * 冻结子组件到指定帧。
+     *
+     * @param callable $renderer 渲染函数
+     * @param int $frame 冻结到的帧号
+     * @param int $duration 冻结持续的帧数
+     * @param int $from 从哪一帧开始冻结
+     */
+    public static function freeze(
+        callable $renderer,
+        int $frame,
+        int $duration,
+        int $from = 0,
+    ): Core\Freeze {
+        return Core\Freeze::make(\Closure::fromCallable($renderer), $frame, $duration, $from);
     }
 
     // ---- 渲染 ----
@@ -253,7 +307,8 @@ class Remotion
     }
 
     /**
-     * 快速创建画布（带透明支持）
+     * 快速创建画布（带透明支持）- GD 版本
+     * @deprecated 请使用 createImageCanvas() 代替
      */
     public static function createCanvas(int $width, int $height, ?array $backgroundColor = null): \GdImage
     {
@@ -277,6 +332,27 @@ class Remotion
     }
 
     /**
+     * 创建 Grafika 图像画布（推荐使用，支持 GD/Imagick 自动检测）
+     *
+     * @param int         $width         宽度
+     * @param int         $height        高度
+     * @param array|null  $backgroundColor 背景色 [R, G, B] 或 null 表示透明
+     * @return \Grafika\ImageInterface 图像对象
+     */
+    public static function createImageCanvas(int $width, int $height, ?array $backgroundColor = null): \Grafika\ImageInterface
+    {
+        $image = \Grafika\Grafika::createBlankImage($width, $height);
+        
+        if ($backgroundColor !== null) {
+            $editor = \Grafika\Grafika::createEditor();
+            $color = new \Grafika\Color(sprintf('#%02x%02x%02x', $backgroundColor[0], $backgroundColor[1], $backgroundColor[2]));
+            $editor->fill($image, $color);
+        }
+        
+        return $image;
+    }
+
+    /**
      * 注册合成（对标 registerRoot()）
      * 批量注册多个合成
      *
@@ -287,5 +363,107 @@ class Remotion
         foreach ($compositions as $comp) {
             $comp->register();
         }
+    }
+
+    // ---- P1: Random ----
+
+    /**
+     * 生成确定性伪随机数
+     *
+     * @param string $seed 随机种子
+     * @param int $frame 帧号
+     * @param float|null $min 最小值
+     * @param float|null $max 最大值
+     * @return float 0-1 或指定范围内的随机数
+     */
+    public static function random(string $seed, int $frame, ?float $min = null, ?float $max = null): float
+    {
+        return Random::get($seed, $frame, $min, $max);
+    }
+
+    /**
+     * 生成确定性随机整数
+     */
+    public static function randomRange(string $seed, int $frame, int $min, int $max): int
+    {
+        return Random::range($seed, $frame, $min, $max);
+    }
+
+    /**
+     * 生成随机颜色
+     */
+    public static function randomColor(string $seed, int $frame): array
+    {
+        return Random::color($seed, $frame);
+    }
+
+    // ---- P1: Transitions ----
+
+    /**
+     * 创建淡入淡出转场
+     */
+    public static function fadeTransition(int $durationInFrames): Transitions\FadeTransition
+    {
+        return new Transitions\FadeTransition($durationInFrames);
+    }
+
+    /**
+     * 创建滑动转场
+     */
+    public static function slideTransition(int $durationInFrames, string $direction = 'left'): Transitions\SlideTransition
+    {
+        return new Transitions\SlideTransition($durationInFrames, $direction);
+    }
+
+    // ---- P2: Noise ----
+
+    /**
+     * 生成 2D Perlin 噪声
+     */
+    public static function noise2D(float $x, float $y, int $seed = 0): float
+    {
+        return Noise::noise2D($x, $y, $seed);
+    }
+
+    /**
+     * 生成 3D Perlin 噪声
+     */
+    public static function noise3D(float $x, float $y, float $z, int $seed = 0): float
+    {
+        return Noise::noise3D($x, $y, $z, $seed);
+    }
+
+    /**
+     * 生成 4D Perlin 噪声
+     */
+    public static function noise4D(float $x, float $y, float $z, float $w, int $seed = 0): float
+    {
+        return Noise::noise4D($x, $y, $z, $w, $seed);
+    }
+
+    /**
+     * 生成分形噪声（FBm）
+     */
+    public static function fbm(float $x, float $y, int $seed = 0, int $octaves = 4): float
+    {
+        return Noise::fbm($x, $y, $seed, $octaves);
+    }
+
+    // ---- P2: Media ----
+
+    /**
+     * 创建音频实例
+     */
+    public static function audio(string $filePath): Media\Audio
+    {
+        return Media\Audio::fromFile($filePath);
+    }
+
+    /**
+     * 创建视频实例
+     */
+    public static function video(string $filePath): Media\Video
+    {
+        return Media\Video::fromFile($filePath);
     }
 }

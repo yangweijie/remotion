@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Yangweijie\Remotion\Layers;
 
+use Grafika\Grafika;
+use Grafika\Color;
+
 /**
  * TextLayer
  *
  * 文字图层，对标 remotion 中的文字渲染（通过 CSS 控制的 div 元素）。
  * 支持自定义字体、大小、颜色、对齐等样式。
+ * 
+ * 支持 Grafika 抽象层（自动检测 GD 或 Imagick）
  */
 class TextLayer extends AbstractLayer
 {
@@ -83,6 +88,84 @@ class TextLayer extends AbstractLayer
         return $this->height;
     }
 
+    /**
+     * 绘制到 Grafika 图像（新版本）
+     */
+    public function drawOnImage(\Grafika\ImageInterface $canvas, int $x = 0, int $y = 0): void
+    {
+        $editor = Grafika::createEditor();
+        $color = new Color(sprintf('#%02x%02x%02x', $this->r, $this->g, $this->b));
+        
+        $drawX = $x + $this->x;
+        $drawY = $y + $this->y;
+
+        if (!empty($this->fontPath) && file_exists($this->fontPath)) {
+            // 使用 Grafika text() 方法（支持 TTF 字体）
+            $this->drawTtfTextGrafika($canvas, $editor, $color, $drawX, $drawY);
+        } else {
+            // 使用 GD 内置字体（需要回退到 GD）
+            $this->drawBuiltinTextGd($canvas, $drawX, $drawY);
+        }
+    }
+
+    /**
+     * 使用 Grafika 绘制 TTF 字体文字
+     */
+    private function drawTtfTextGrafika(\Grafika\ImageInterface $canvas, $editor, Color $color, int $x, int $y): void
+    {
+        // 计算文字边界框
+        $bbox = imagettfbbox($this->fontSize, 0, $this->fontPath, $this->text);
+        if ($bbox === false) {
+            return;
+        }
+
+        $textWidth  = $bbox[2] - $bbox[0];
+
+        // 根据对齐方式调整 X
+        $drawX = match ($this->align) {
+            'center' => (int) ($x + ($this->width - $textWidth) / 2),
+            'right'  => (int) ($x + $this->width - $textWidth),
+            default  => $x,
+        };
+
+        // Y 坐标基线调整（imagettftext 使用基线坐标）
+        $drawY = $y + $this->fontSize;
+
+        // 使用 Grafika text 方法
+        $editor->text($canvas, $this->text, $this->fontSize, $drawX, $drawY, $color, $this->fontPath);
+    }
+
+    /**
+     * 使用 GD 绘制内置字体文字（Grafika 不支持内置字体）
+     */
+    private function drawBuiltinTextGd(\Grafika\ImageInterface $canvas, int $x, int $y): void
+    {
+        $core = $canvas->getCore();
+        
+        if (!($core instanceof \GdImage)) {
+            // Imagick 不支持 GD 内置字体，需要转换
+            return;
+        }
+
+        $font = min(5, max(1, (int) ($this->fontSize / 10)));
+        $color = imagecolorallocate($core, $this->r, $this->g, $this->b);
+
+        $charWidth = imagefontwidth($font);
+        $textWidth = strlen($this->text) * $charWidth;
+
+        $drawX = match ($this->align) {
+            'center' => $x + (int) (($this->width - $textWidth) / 2),
+            'right'  => $x + $this->width - $textWidth,
+            default  => $x,
+        };
+
+        imagestring($core, $font, $drawX, $y, $this->text, $color);
+    }
+
+    /**
+     * 绘制到 GD 画布（兼容版本）
+     * @deprecated 请使用 drawOnImage() 代替
+     */
     public function drawOn(\GdImage $canvas, int $x = 0, int $y = 0): void
     {
         $layer = $this->createCanvas($this->width, $this->height);
@@ -103,30 +186,26 @@ class TextLayer extends AbstractLayer
     }
 
     /**
-     * 使用 TTF 字体绘制文字（支持自定义字体）
+     * 使用 TTF 字体绘制文字（GD 版本）
      */
     private function drawTtfText(\GdImage $canvas, int $color, int $x, int $y): void
     {
-        // 计算文字边界框
         $bbox = imagettfbbox($this->fontSize, 0, $this->fontPath, $this->text);
         if ($bbox === false) {
             return;
         }
 
         $textWidth  = $bbox[2] - $bbox[0];
-        $textHeight = abs($bbox[7] - $bbox[1]);
 
-        // 根据对齐方式调整 X
         $drawX = match ($this->align) {
-            'center' => $x + ($this->width - $textWidth) / 2,
-            'right'  => $x + $this->width - $textWidth,
+            'center' => (int) ($x + ($this->width - $textWidth) / 2),
+            'right'  => (int) ($x + $this->width - $textWidth),
             default  => $x,
         };
 
-        // Y 坐标基线调整（imagettftext 使用基线坐标）
         $drawY = $y + $this->fontSize;
 
-        imagettftext($canvas, $this->fontSize, 0, (int) $drawX, $drawY, $color, $this->fontPath, $this->text);
+        imagettftext($canvas, $this->fontSize, 0, $drawX, $drawY, $color, $this->fontPath, $this->text);
     }
 
     /**
@@ -134,7 +213,6 @@ class TextLayer extends AbstractLayer
      */
     private function drawBuiltinText(\GdImage $canvas, int $x, int $y): void
     {
-        // GD 内置字体（1-5）
         $font = min(5, max(1, (int) ($this->fontSize / 10)));
         $color = imagecolorallocate($canvas, $this->r, $this->g, $this->b);
 

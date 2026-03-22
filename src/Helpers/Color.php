@@ -152,12 +152,21 @@ class Color
 
     /**
      * 转换为 GD 颜色整数
+     * @deprecated 请使用 toGrafikaColor() 代替
      */
     public function toGdColor(\GdImage $image): int
     {
         // GD 的 alpha 范围：0（不透明）~ 127（完全透明）
         $gdAlpha = (int) round((1 - $this->a) * 127);
         return imagecolorallocatealpha($image, $this->r, $this->g, $this->b, $gdAlpha);
+    }
+
+    /**
+     * 转换为 Grafika Color 对象
+     */
+    public function toGrafikaColor(): \Grafika\Color
+    {
+        return new \Grafika\Color($this->toHex(), $this->a);
     }
 
     public function getR(): int { return $this->r; }

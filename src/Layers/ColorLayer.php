@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Yangweijie\Remotion\Layers;
 
+use Grafika\Grafika;
+use Grafika\Color;
+
 /**
  * ColorLayer
  *
  * 纯色填充图层，对标 remotion 中的 AbsoluteFill 背景色。
  * 可用于创建背景、色块、渐变效果等。
+ * 
+ * 支持 Grafika 抽象层（自动检测 GD 或 Imagick）
  */
 class ColorLayer extends AbstractLayer
 {
@@ -82,6 +87,38 @@ class ColorLayer extends AbstractLayer
         return $this->height;
     }
 
+    /**
+     * 获取 Grafika Color 对象
+     */
+    protected function getGrafikaColor(): Color
+    {
+        // Grafika alpha: 0-1 (1=不透明), GD alpha: 0-127 (0=不透明)
+        $opacity = $this->alpha === 0 ? 1.0 : 1.0 - ($this->alpha / 127);
+        return new Color(
+            sprintf('#%02x%02x%02x', $this->r, $this->g, $this->b),
+            $opacity
+        );
+    }
+
+    /**
+     * 绘制到 Grafika 图像（新版本）
+     */
+    public function drawOnImage(\Grafika\ImageInterface $canvas, int $x = 0, int $y = 0): void
+    {
+        $editor = Grafika::createEditor();
+        
+        // 创建纯色图层
+        $layer = $this->createImageCanvas($this->width, $this->height);
+        $editor->fill($layer, $this->getGrafikaColor());
+        
+        // 混合到目标画布
+        $this->blendOntoImage($canvas, $layer, $x + $this->x, $y + $this->y);
+    }
+
+    /**
+     * 绘制到 GD 画布（兼容版本）
+     * @deprecated 请使用 drawOnImage() 代替
+     */
     public function drawOn(\GdImage $canvas, int $x = 0, int $y = 0): void
     {
         $layer = $this->createCanvas($this->width, $this->height);

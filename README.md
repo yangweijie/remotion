@@ -12,6 +12,8 @@ PHP 版的 Remotion - 程序化视频/动画合成库。
 - **Spring** - 物理弹簧动画
 - **Easing** - 丰富的缓动函数（贝塞尔曲线、弹性、回弹等）
 - **Layers** - 颜色层、渐变层、图片层、文字层
+- **Grafika 支持** - 支持 GD 和 Imagick 双后端图像处理
+- **GIF 优化** - 使用 gifsicle/ffmpeg 优化 GIF 文件大小
 
 ## 安装
 
@@ -69,6 +71,13 @@ $comp = Remotion::composition(
 Remotion::registerRoot([$comp]);
 $renderer = Remotion::render($comp);
 $renderer->renderToGif('output.gif');
+
+// 使用优化渲染（推荐用于长视频）
+$renderer->renderToGifOptimized('output.gif', [], [
+    'lossy' => 30,      // 有损压缩级别 (0-200)，0=无损
+    'colors' => 128,     // 颜色数 (2-256)
+    'optimize' => 3,     // 优化级别 (1-3)
+]);
 ```
 
 ## 核心 API
@@ -293,6 +302,167 @@ $newCtx = $ctx->withProps(['title' => 'New Title']);
 $inRange = $ctx->isInRange(10, 30);
 ```
 
+## Grafika 支持
+
+PHP Remotion 支持 [Grafika](https://github.com/kosinix/grafika) 图像处理库，提供 GD 和 Imagick 双后端支持。
+
+### 安装 Grafika
+
+```bash
+composer require kosinix/grafika
+```
+
+### 创建 Grafika 画布
+
+```php
+use Yangweijie\Remotion\Remotion;
+
+// 创建空白画布
+$image = Remotion::createImageCanvas(800, 600);
+
+// 创建带背景色的画布
+$image = Remotion::createImageCanvas(800, 600, [255, 0, 0]); // 红色背景
+```
+
+### Grafika Layer 方法
+
+所有 Layer 类都支持 Grafika 的 `drawOnImage()` 方法：
+
+```php
+use Yangweijie\Remotion\Remotion;
+use Grafika\Grafika;
+
+$canvas = Remotion::createImageCanvas(800, 600);
+
+// 颜色层
+$colorLayer = Remotion::colorLayer(200, 100, 255, 0, 0);
+$colorLayer->drawOnImage($canvas, 50, 50);
+
+// 渐变层
+$gradient = Remotion::gradientLayer(300, 200,
+    ['r' => 255, 'g' => 0, 'b' => 0],
+    ['r' => 0, 'g' => 0, 'b' => 255],
+    'vertical'
+);
+$gradient->drawOnImage($canvas, 100, 100);
+
+// 文字层（支持中文 TTF 字体）
+$text = Remotion::textLayer('你好世界', [
+    'fontSize' => 24,
+    'fontPath' => '/path/to/font.ttf',
+    'r' => 255, 'g' => 255, 'b' => 255,
+]);
+$text->drawOnImage($canvas, 200, 300);
+
+// 保存图像
+$editor = Grafika::createEditor();
+$editor->save($canvas, 'output.png');
+```
+
+### 后端自动检测
+
+Grafika 会自动检测可用的图像处理后端：
+
+```php
+use Grafika\Grafika;
+
+$editorName = Grafika::detectAvailableEditor();
+// 返回 'Imagick' 或 'Gd'
+```
+
+**Imagick 后端优势**：
+- 更好的渐变质量
+- 支持更多图像格式
+- 更高效的内存管理
+
+## GIF 优化渲染
+
+使用 `renderToGifOptimized()` 方法可获得更小的 GIF 文件：
+
+### 基础用法
+
+```php
+use Yangweijie\Remotion\Remotion;
+use Yangweijie\Remotion\Rendering\Renderer;
+
+$composition = Remotion::composition(...);
+$renderer = new Renderer($composition);
+
+// 无损优化
+$renderer->renderToGifOptimized('output.gif');
+
+// 高压缩（适合长视频）
+$renderer->renderToGifOptimized('output.gif', [], [
+    'lossy' => 50,       // 有损压缩
+    'colors' => 64,      // 减少颜色数
+    'optimize' => 3,     // 最高优化级别
+]);
+```
+
+### 优化选项
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `lossy` | int | 0 | 有损压缩级别 (0-200)，0=无损 |
+| `colors` | int | 256 | 颜色数 (2-256)，减少可显著降低文件大小 |
+| `optimize` | int | 3 | 优化级别 (1-3)，3 为最高 |
+| `cleanup` | bool | true | 是否清理临时文件 |
+
+### 工具依赖
+
+优化渲染需要安装外部工具：
+
+```bash
+# macOS
+brew install gifsicle
+
+# Ubuntu/Debian
+sudo apt install gifsicle
+
+# 备选：ffmpeg（已自动检测）
+# macOS: brew install ffmpeg
+```
+
+**工具优先级**：`gifsicle` > `ffmpeg` > GD 回退
+
+### 性能对比
+
+| 场景 | GD 原生 | 优化后 | 压缩率 |
+|------|---------|--------|--------|
+| 简单动画 60帧 | 22 KB | 23 KB | -4% |
+| 复杂动画 150帧 800x400 | 295 KB | 200 KB | **32%** |
+| 高压缩设置 | - | 可达 50%+ | 视内容而定 |
+
+### 流式 GIF 编码 ⭐ 内存敏感场景
+
+使用 `renderToGifStreaming()` 方法实现最低内存占用：
+
+```php
+// 流式编码：直接写入文件，不累积帧数据
+$renderer->renderToGifStreaming('output.gif');
+```
+
+**内存优势**：内存占用恒定，仅相当于一帧的大小。
+
+### 系统内存对比（300帧 1920x1080）
+
+| 方式 | 系统内存峰值 | 文件大小 |
+|------|-------------|---------|
+| GD 原生 | 741 MB | 13.7 MB |
+| 流式编码 | **57.8 MB** | 1.2 MB |
+| gifsicle 优化 | **49 MB** | 9.3 MB |
+
+**内存节省：92%+**
+
+### 选择建议
+
+| 场景 | 推荐方法 |
+|------|----------|
+| 短视频（<60帧） | `renderToGif()` |
+| 长视频（>60帧） | `renderToGifOptimized()` |
+| 内存敏感场景 | `renderToGifStreaming()` |
+| 最小文件体积 | `renderToGifOptimized()` + `lossy` |
+
 ## 示例
 
 ### 淡入淡出文字动画
@@ -475,6 +645,11 @@ php example.php multi-sequence
 | VideoConfig | 14 | 视频配置测试 |
 | RenderContext | 10 | 渲染上下文测试 |
 | Sequence | 12 | 序列组件测试 |
+| Grafika Layers | 12 | Grafika 图层测试 |
+| Remotion Grafika | 3 | Grafika 画布测试 |
+| Renderer Grafika | 6 | Grafika 渲染测试 |
+| Color Grafika | 4 | 颜色转换测试 |
+| GIF Optimization | 3 | GIF 优化测试 |
 
 ## 项目结构
 

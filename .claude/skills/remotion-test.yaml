@@ -1,5 +1,5 @@
 name: remotion-test
-description: 运行 PHP Remotion 项目测试
+description: 运行 PHP Remotion 项目测试（123 个测试，278 个断言）
 triggers:
   - "运行测试"
   - "run tests"
@@ -14,7 +14,7 @@ parameters:
   - name: group
     type: string
     required: false
-    description: 测试分组 (easing, interpolate, spring, color, video-config, render-context, sequence)
+    description: 测试分组
     default: ""
 examples:
   - "运行所有测试"
@@ -32,3 +32,6 @@ availableGroups:
   - video-config
   - render-context
   - sequence
+  - grafika-layers
+  - gif-optimization
+  - streaming-gif

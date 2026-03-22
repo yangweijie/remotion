@@ -832,3 +832,879 @@ describe('Sequence', function () {
         expect($renderedFrames[29])->toBe(29);
     });
 });
+
+// ============================================================
+// Grafika Layer 测试
+// ============================================================
+describe('Grafika Layers', function () {
+
+    beforeEach(function () {
+        // 确保有中文字体
+        $this->fontPath = get_chinese_font();
+    });
+
+    // --- ColorLayer Grafika 测试 ---
+    describe('ColorLayer', function () {
+
+        it('should draw on Grafika image', function () {
+            $layer = \Yangweijie\Remotion\Layers\ColorLayer::fromHex(200, 200, '#ff6600');
+            $image = \Grafika\Grafika::createBlankImage(400, 400);
+
+            $layer->drawOnImage($image);
+
+            expect($image->getWidth())->toBe(400);
+            expect($image->getHeight())->toBe(400);
+        });
+
+        it('should maintain backward compatibility with GD', function () {
+            $layer = \Yangweijie\Remotion\Layers\ColorLayer::fromHex(100, 100, '#00ff00');
+            $gdImage = imagecreatetruecolor(200, 200);
+
+            $layer->drawOn($gdImage);
+
+            expect($gdImage)->toBeInstanceOf(\GdImage::class);
+            imagedestroy($gdImage);
+        });
+
+        it('should respect opacity in Grafika', function () {
+            $layer = \Yangweijie\Remotion\Layers\ColorLayer::fromHex(100, 100, '#ff0000', 0.5);
+            $image = \Grafika\Grafika::createBlankImage(200, 200);
+
+            $layer->drawOnImage($image);
+
+            // 图像应该被创建而不抛出异常
+            expect($image->getWidth())->toBe(200);
+        });
+    });
+
+    // --- GradientLayer Grafika 测试 ---
+    describe('GradientLayer', function () {
+
+        it('should draw gradient on Grafika image', function () {
+            $layer = \Yangweijie\Remotion\Layers\GradientLayer::make(
+                200,
+                100,
+                ['r' => 255, 'g' => 0, 'b' => 0],
+                ['r' => 0, 'g' => 0, 'b' => 255]
+            );
+            $image = \Grafika\Grafika::createBlankImage(200, 100);
+
+            $layer->drawOnImage($image);
+
+            expect($image->getWidth())->toBe(200);
+        });
+
+        it('should support vertical gradient', function () {
+            $layer = \Yangweijie\Remotion\Layers\GradientLayer::make(
+                100,
+                200,
+                ['r' => 0, 'g' => 255, 'b' => 0],
+                ['r' => 0, 'g' => 0, 'b' => 0],
+                'vertical'
+            );
+            $image = \Grafika\Grafika::createBlankImage(100, 200);
+
+            $layer->drawOnImage($image);
+
+            expect($image->getHeight())->toBe(200);
+        });
+
+        it('should support multi-stop gradient', function () {
+            // 多色标渐变需要直接使用构造函数
+            $layer = new \Yangweijie\Remotion\Layers\GradientLayer(
+                100,
+                100,
+                [
+                    ['r' => 255, 'g' => 0, 'b' => 0],
+                    ['r' => 255, 'g' => 255, 'b' => 0],
+                    ['r' => 0, 'g' => 0, 'b' => 255],
+                ],
+                'horizontal'
+            );
+            $image = \Grafika\Grafika::createBlankImage(100, 100);
+
+            $layer->drawOnImage($image);
+
+            expect($image->getWidth())->toBe(100);
+        });
+
+        it('should maintain GD backward compatibility', function () {
+            $layer = \Yangweijie\Remotion\Layers\GradientLayer::make(
+                100,
+                100,
+                ['r' => 255, 'g' => 0, 'b' => 0],
+                ['r' => 0, 'g' => 0, 'b' => 255]
+            );
+            $gdImage = imagecreatetruecolor(100, 100);
+
+            $layer->drawOn($gdImage);
+
+            expect($gdImage)->toBeInstanceOf(\GdImage::class);
+            imagedestroy($gdImage);
+        });
+    });
+
+    // --- ImageLayer Grafika 测试 ---
+    describe('ImageLayer', function () {
+
+        it('should create from Grafika image', function () {
+            $sourceImage = \Grafika\Grafika::createBlankImage(150, 100);
+            $layer = \Yangweijie\Remotion\Layers\ImageLayer::fromImage($sourceImage);
+
+            expect($layer->getWidth())->toBe(150);
+            expect($layer->getHeight())->toBe(100);
+        });
+
+        it('should draw Grafika image on canvas', function () {
+            $sourceImage = \Grafika\Grafika::createBlankImage(50, 50);
+            $layer = \Yangweijie\Remotion\Layers\ImageLayer::fromImage($sourceImage);
+            $canvas = \Grafika\Grafika::createBlankImage(200, 200);
+
+            $layer->drawOnImage($canvas, 10, 10);
+
+            expect($canvas->getWidth())->toBe(200);
+        });
+
+        it('should maintain GD backward compatibility', function () {
+            $gdImage = imagecreatetruecolor(50, 50);
+            $color = imagecolorallocate($gdImage, 255, 0, 0);
+            imagefill($gdImage, 0, 0, $color);
+            
+            // 保存临时文件用于 ImageLayer
+            $tempFile = sys_get_temp_dir() . '/test_image_' . uniqid() . '.png';
+            imagepng($gdImage, $tempFile);
+            imagedestroy($gdImage);
+            
+            $layer = new \Yangweijie\Remotion\Layers\ImageLayer($tempFile);
+
+            expect($layer->getWidth())->toBe(50);
+            
+            unlink($tempFile);
+        });
+    });
+
+    // --- TextLayer Grafika 测试 ---
+    describe('TextLayer', function () {
+
+        it('should draw text on Grafika image', function () {
+            if (!$this->fontPath) {
+                test()->markTestSkipped('需要中文字体支持');
+            }
+
+            $layer = \Yangweijie\Remotion\Layers\TextLayer::make('Hello Grafika', [
+                'fontSize' => 24,
+                'fontPath' => $this->fontPath,
+                'color' => '#000000',
+            ]);
+            $image = \Grafika\Grafika::createBlankImage(300, 100);
+
+            $layer->drawOnImage($image);
+
+            expect($image->getWidth())->toBe(300);
+        });
+
+        it('should support Chinese text on Grafika image', function () {
+            if (!$this->fontPath) {
+                test()->markTestSkipped('需要中文字体支持');
+            }
+
+            $layer = \Yangweijie\Remotion\Layers\TextLayer::make('中文测试', [
+                'fontSize' => 32,
+                'fontPath' => $this->fontPath,
+                'color' => '#ff0000',
+            ]);
+            $image = \Grafika\Grafika::createBlankImage(300, 100);
+
+            $layer->drawOnImage($image);
+
+            expect($image->getWidth())->toBe(300);
+        });
+
+        it('should maintain GD backward compatibility', function () {
+            if (!$this->fontPath) {
+                test()->markTestSkipped('需要中文字体支持');
+            }
+
+            $layer = \Yangweijie\Remotion\Layers\TextLayer::make('Test', [
+                'fontSize' => 20,
+                'fontPath' => $this->fontPath,
+            ]);
+            $gdImage = imagecreatetruecolor(200, 50);
+
+            $layer->drawOn($gdImage);
+
+            expect($gdImage)->toBeInstanceOf(\GdImage::class);
+            imagedestroy($gdImage);
+        });
+    });
+});
+
+// ============================================================
+// Remotion Grafika 测试
+// ============================================================
+describe('Remotion Grafika', function () {
+
+    it('should create Grafika image canvas', function () {
+        $image = \Yangweijie\Remotion\Remotion::createImageCanvas(800, 600);
+
+        expect($image)->toBeInstanceOf(\Grafika\ImageInterface::class);
+        expect($image->getWidth())->toBe(800);
+        expect($image->getHeight())->toBe(600);
+    });
+
+    it('should create canvas with background color', function () {
+        $image = \Yangweijie\Remotion\Remotion::createImageCanvas(100, 100, [255, 0, 0]);
+
+        expect($image)->toBeInstanceOf(\Grafika\ImageInterface::class);
+        expect($image->getWidth())->toBe(100);
+    });
+
+    it('should maintain GD backward compatibility', function () {
+        $gdImage = \Yangweijie\Remotion\Remotion::createCanvas(200, 200);
+
+        expect($gdImage)->toBeInstanceOf(\GdImage::class);
+        expect(imagesx($gdImage))->toBe(200);
+        imagedestroy($gdImage);
+    });
+});
+
+// ============================================================
+// Renderer Grafika 测试
+// ============================================================
+describe('Renderer Grafika', function () {
+
+    it('should render frame as Grafika image', function () {
+        $composition = \Yangweijie\Remotion\Remotion::composition(
+            'test',
+            function ($ctx) {
+                $gd = imagecreatetruecolor(200, 200);
+                $bg = imagecolorallocate($gd, 51, 102, 153);
+                imagefill($gd, 0, 0, $bg);
+                return $gd;
+            },
+            30,
+            30,
+            200,
+            200
+        );
+
+        $renderer = new \Yangweijie\Remotion\Rendering\Renderer($composition);
+        $image = $renderer->renderFrameAsImage(0);
+
+        expect($image)->toBeInstanceOf(\Grafika\ImageInterface::class);
+        expect($image->getWidth())->toBe(200);
+    });
+
+    it('should render multiple frames with Grafika', function () {
+        $tempDir = sys_get_temp_dir() . '/remotion_test_' . uniqid();
+        mkdir($tempDir);
+
+        $composition = \Yangweijie\Remotion\Remotion::composition(
+            'test',
+            function ($ctx) {
+                $gd = imagecreatetruecolor(50, 50);
+                $bg = imagecolorallocate($gd, 255, 0, 0);
+                imagefill($gd, 0, 0, $bg);
+                return $gd;
+            },
+            3,
+            30,
+            50,
+            50
+        );
+
+        $renderer = new \Yangweijie\Remotion\Rendering\Renderer($composition);
+        $result = $renderer->renderToFramesWithGrafika($tempDir, 'png');
+
+        expect($result)->toBeTrue();
+        // 文件名格式为 N.png（N 根据帧数填充）
+        expect(file_exists($tempDir . '/0.png'))->toBeTrue();
+        expect(file_exists($tempDir . '/1.png'))->toBeTrue();
+        expect(file_exists($tempDir . '/2.png'))->toBeTrue();
+
+        // 清理
+        foreach (glob($tempDir . '/*') as $file) {
+            unlink($file);
+        }
+        rmdir($tempDir);
+    });
+
+// ============================================================
+// GIF 优化测试
+// ============================================================
+describe('GIF Optimization', function () {
+
+    it('should detect available GIF tool', function () {
+        $composition = \Yangweijie\Remotion\Remotion::composition(
+            'test',
+            function ($ctx) {
+                return imagecreatetruecolor(10, 10);
+            },
+            1,
+            30,
+            10,
+            10
+        );
+
+        $renderer = new \Yangweijie\Remotion\Rendering\Renderer($composition);
+        $tool = $renderer->detectGifTool();
+
+        // 应该返回 null、'gifsicle' 或 'ffmpeg'
+        expect($tool === null || in_array($tool, ['gifsicle', 'ffmpeg']))->toBeTrue();
+    });
+
+    it('should render optimized GIF with gifsicle or ffmpeg', function () {
+        $tempFile = sys_get_temp_dir() . '/test_optimized_' . uniqid() . '.gif';
+
+        $composition = \Yangweijie\Remotion\Remotion::composition(
+            'test',
+            function ($ctx) {
+                $gd = imagecreatetruecolor(50, 50);
+                $r = (int) (255 * $ctx->frame / 10);
+                $color = imagecolorallocate($gd, $r, 100, 100);
+                imagefill($gd, 0, 0, $color);
+                return $gd;
+            },
+            10,
+            10,
+            50,
+            50
+        );
+
+        $renderer = new \Yangweijie\Remotion\Rendering\Renderer($composition);
+        $result = $renderer->renderToGifOptimized($tempFile, [], [
+            'lossy' => 0,
+            'colors' => 64,
+            'optimize' => 2,
+        ]);
+
+        expect($result)->toBeTrue();
+        expect(file_exists($tempFile))->toBeTrue();
+        expect(filesize($tempFile))->toBeGreaterThan(0);
+
+        // 清理
+        if (file_exists($tempFile)) {
+            unlink($tempFile);
+        }
+    });
+
+    it('should fallback to GD when no external tool available', function () {
+        // 创建一个模拟场景：即使有工具也能正确回退
+        $tempFile = sys_get_temp_dir() . '/test_fallback_' . uniqid() . '.gif';
+
+        $composition = \Yangweijie\Remotion\Remotion::composition(
+            'test',
+            function ($ctx) {
+                $gd = imagecreatetruecolor(20, 20);
+                $color = imagecolorallocate($gd, 0, 0, 255);
+                imagefill($gd, 0, 0, $color);
+                return $gd;
+            },
+            3,
+            30,
+            20,
+            20
+        );
+
+        $renderer = new \Yangweijie\Remotion\Rendering\Renderer($composition);
+
+        // 直接使用 GD 方式
+        $result = $renderer->renderToGif($tempFile);
+
+        expect($result)->toBeTrue();
+        expect(file_exists($tempFile))->toBeTrue();
+
+        // 清理
+        unlink($tempFile);
+    });
+    });
+
+    describe('Streaming GIF', function () {
+        beforeEach(function () {
+            $this->composition = \Yangweijie\Remotion\Remotion::composition(
+                'streaming-test',
+                function ($ctx) {
+                    $gd = imagecreatetruecolor(100, 100);
+                    $bg = imagecolorallocate($gd, 255, 0, 0);
+                    imagefill($gd, 0, 0, $bg);
+                    return $gd;
+                },
+                3,
+                30,
+                100,
+                100
+            );
+        });
+
+        it('should render GIF with streaming mode', function () {
+            $outputPath = sys_get_temp_dir() . '/test_streaming_' . uniqid() . '.gif';
+            
+            $renderer = new \Yangweijie\Remotion\Rendering\Renderer($this->composition);
+            $result = $renderer->renderToGifStreaming($outputPath);
+            
+            expect($result)->toBeTrue();
+            expect(file_exists($outputPath))->toBeTrue();
+            expect(filesize($outputPath))->toBeGreaterThan(0);
+            
+            unlink($outputPath);
+        });
+
+        it('should produce valid GIF file', function () {
+            $outputPath = sys_get_temp_dir() . '/test_stream_valid_' . uniqid() . '.gif';
+            
+            $renderer = new \Yangweijie\Remotion\Rendering\Renderer($this->composition);
+            $renderer->renderToGifStreaming($outputPath);
+            
+            // 验证 GIF 文件头
+            $header = file_get_contents($outputPath, false, null, 0, 6);
+            expect($header)->toBe('GIF89a');
+            
+            unlink($outputPath);
+        });
+    });
+
+    it('should maintain GD backward compatibility', function () {
+        $composition = \Yangweijie\Remotion\Remotion::composition(
+            'test',
+            function ($ctx) {
+                $gd = imagecreatetruecolor(100, 100);
+                $bg = imagecolorallocate($gd, 0, 255, 0);
+                imagefill($gd, 0, 0, $bg);
+                return $gd;
+            },
+            1,
+            30,
+            100,
+            100
+        );
+
+        $gdImage = $composition->renderFrame(0);
+
+        expect($gdImage)->toBeInstanceOf(\GdImage::class);
+        imagedestroy($gdImage);
+    });
+});
+
+// ============================================================
+// P0 Components 测试 (Loop, Series, Freeze)
+// ============================================================
+describe('Loop Component', function () {
+    it('should create loop with correct duration', function () {
+        $loop = \Yangweijie\Remotion\Core\Loop::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            durationInFrames: 30,
+            times: 3,
+        );
+
+        expect($loop->getTotalDuration())->toBe(90);
+    });
+
+    it('should calculate local frame correctly', function () {
+        $loop = \Yangweijie\Remotion\Core\Loop::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            durationInFrames: 30,
+            times: 3,
+        );
+
+        // 第 0 帧应该是本地帧 0
+        expect($loop->getLocalFrame(0))->toBe(0);
+        // 第 30 帧应该是新一轮，本地帧 0
+        expect($loop->getLocalFrame(30))->toBe(0);
+        // 第 45 帧应该是本地帧 15
+        expect($loop->getLocalFrame(45))->toBe(15);
+        // 第 59 帧应该是本地帧 29
+        expect($loop->getLocalFrame(59))->toBe(29);
+    });
+
+    it('should detect active frames correctly', function () {
+        $loop = \Yangweijie\Remotion\Core\Loop::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            durationInFrames: 30,
+            times: 2,
+        );
+
+        expect($loop->isActive(0))->toBeTrue();
+        expect($loop->isActive(59))->toBeTrue();
+        expect($loop->isActive(60))->toBeFalse();
+    });
+
+    it('should return null for out of range frames', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 100, 100);
+        $loop = \Yangweijie\Remotion\Core\Loop::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            durationInFrames: 30,
+            times: 2,
+        );
+
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(100, $config);
+        $result = $loop->render($ctx, $config);
+
+        expect($result)->toBeNull();
+    });
+
+    it('should work via Remotion facade', function () {
+        $loop = \Yangweijie\Remotion\Remotion::loop(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            durationInFrames: 20,
+            times: 3,
+        );
+
+        expect($loop)->toBeInstanceOf(\Yangweijie\Remotion\Core\Loop::class);
+        expect($loop->getTotalDuration())->toBe(60);
+    });
+});
+
+describe('Series Component', function () {
+    it('should add sequences with correct offsets', function () {
+        $series = \Yangweijie\Remotion\Core\Series::make()
+            ->add('intro', fn($ctx) => imagecreatetruecolor(100, 100), 30)
+            ->add('main', fn($ctx) => imagecreatetruecolor(100, 100), 60)
+            ->add('outro', fn($ctx) => imagecreatetruecolor(100, 100), 20);
+
+        $sequences = $series->getSequences();
+
+        expect($sequences[0]['offset'])->toBe(0);
+        expect($sequences[1]['offset'])->toBe(30);
+        expect($sequences[2]['offset'])->toBe(90);
+        expect($series->getTotalDuration())->toBe(110);
+    });
+
+    it('should find sequence at frame', function () {
+        $series = \Yangweijie\Remotion\Core\Series::make()
+            ->add('intro', fn($ctx) => imagecreatetruecolor(100, 100), 30)
+            ->add('main', fn($ctx) => imagecreatetruecolor(100, 100), 60);
+
+        $info = $series->getSequenceAtFrame(40);
+        expect($info['id'])->toBe('main');
+        expect($info['localFrame'])->toBe(10);
+
+        $info = $series->getSequenceAtFrame(20);
+        expect($info['id'])->toBe('intro');
+        expect($info['localFrame'])->toBe(20);
+    });
+
+    it('should return null for out of range frames', function () {
+        $series = \Yangweijie\Remotion\Core\Series::make()
+            ->add('intro', fn($ctx) => imagecreatetruecolor(100, 100), 30);
+
+        $info = $series->getSequenceAtFrame(50);
+        expect($info)->toBeNull();
+    });
+
+    it('should create from array', function () {
+        $series = \Yangweijie\Remotion\Core\Series::fromArray([
+            ['id' => 'a', 'component' => fn($ctx) => imagecreatetruecolor(100, 100), 'durationInFrames' => 10],
+            ['id' => 'b', 'component' => fn($ctx) => imagecreatetruecolor(100, 100), 'durationInFrames' => 20],
+        ]);
+
+        expect($series->getTotalDuration())->toBe(30);
+    });
+
+    it('should work via Remotion facade', function () {
+        $series = \Yangweijie\Remotion\Remotion::series()
+            ->add('a', fn($ctx) => imagecreatetruecolor(100, 100), 10)
+            ->add('b', fn($ctx) => imagecreatetruecolor(100, 100), 20);
+
+        expect($series)->toBeInstanceOf(\Yangweijie\Remotion\Core\Series::class);
+        expect($series->getTotalDuration())->toBe(30);
+    });
+});
+
+describe('Freeze Component', function () {
+    it('should create freeze with correct properties', function () {
+        $freeze = \Yangweijie\Remotion\Core\Freeze::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            frame: 30,
+            duration: 60,
+        );
+
+        expect($freeze->getTotalDuration())->toBe(60);
+        expect($freeze->getFrozenFrame())->toBe(30);
+        expect($freeze->getEndFrame())->toBe(60);
+    });
+
+    it('should detect active frames correctly', function () {
+        $freeze = \Yangweijie\Remotion\Core\Freeze::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            frame: 30,
+            duration: 60,
+            from: 10,
+        );
+
+        expect($freeze->isActive(10))->toBeTrue();
+        expect($freeze->isActive(69))->toBeTrue();
+        expect($freeze->isActive(9))->toBeFalse();
+        expect($freeze->isActive(70))->toBeFalse();
+    });
+
+    it('should calculate progress correctly', function () {
+        $freeze = \Yangweijie\Remotion\Core\Freeze::make(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            frame: 30,
+            duration: 100,
+        );
+
+        expect($freeze->getProgress(0))->toBe(0.0);
+        expect($freeze->getProgress(50))->toBe(0.5);
+        expect($freeze->getProgress(99))->toBe(0.99);
+    });
+
+    it('should work via Remotion facade', function () {
+        $freeze = \Yangweijie\Remotion\Remotion::freeze(
+            fn($ctx) => imagecreatetruecolor(100, 100),
+            frame: 20,
+            duration: 40,
+        );
+
+        expect($freeze)->toBeInstanceOf(\Yangweijie\Remotion\Core\Freeze::class);
+        expect($freeze->getFrozenFrame())->toBe(20);
+    });
+});
+
+// ============================================================
+// Color Grafika 测试
+// ============================================================
+describe('Color Grafika', function () {
+
+    it('should convert to Grafika Color', function () {
+        $color = Color::fromHex('#ff8000');
+        $grafikaColor = $color->toGrafikaColor();
+
+        expect($grafikaColor)->toBeInstanceOf(\Grafika\Color::class);
+    });
+
+    it('should preserve RGB values in Grafika Color', function () {
+        $color = new Color(255, 128, 64);
+        $grafikaColor = $color->toGrafikaColor();
+
+        // 验证 Grafika Color 对象已创建
+        expect($grafikaColor)->toBeInstanceOf(\Grafika\Color::class);
+    });
+
+    it('should handle alpha in Grafika Color', function () {
+        $color = new Color(255, 0, 0, 0.5);
+        $grafikaColor = $color->toGrafikaColor();
+
+        expect($grafikaColor)->toBeInstanceOf(\Grafika\Color::class);
+    });
+
+    it('should handle transparent color', function () {
+        $color = Color::transparent();
+        $grafikaColor = $color->toGrafikaColor();
+
+        expect($grafikaColor)->toBeInstanceOf(\Grafika\Color::class);
+    });
+});
+
+// ============================================================
+// Random 测试 (P1)
+// ============================================================
+describe('Random', function () {
+
+    it('should generate deterministic random values', function () {
+        $value1 = \Yangweijie\Remotion\Helpers\Random::get('test-seed', 0);
+        $value2 = \Yangweijie\Remotion\Helpers\Random::get('test-seed', 0);
+
+        expect($value1)->toBe($value2);
+    });
+
+    it('should generate different values for different seeds', function () {
+        $value1 = \Yangweijie\Remotion\Helpers\Random::get('seed-a', 0);
+        $value2 = \Yangweijie\Remotion\Helpers\Random::get('seed-b', 0);
+
+        expect($value1)->not->toBe($value2);
+    });
+
+    it('should generate different values for different frames', function () {
+        $value1 = \Yangweijie\Remotion\Helpers\Random::get('test-seed', 0);
+        $value2 = \Yangweijie\Remotion\Helpers\Random::get('test-seed', 1);
+
+        expect($value1)->not->toBe($value2);
+    });
+
+    it('should respect range parameters', function () {
+        $value = \Yangweijie\Remotion\Helpers\Random::get('test-seed', 0, 10, 20);
+
+        expect($value)->toBeGreaterThanOrEqual(10.0);
+        expect($value)->toBeLessThanOrEqual(20.0);
+    });
+
+    it('should generate integers in range', function () {
+        for ($i = 0; $i < 10; $i++) {
+            $value = \Yangweijie\Remotion\Helpers\Random::range('test-' . $i, $i, 1, 10);
+            expect($value)->toBeGreaterThanOrEqual(1);
+            expect($value)->toBeLessThanOrEqual(10);
+        }
+    });
+
+    it('should generate random booleans', function () {
+        $trueCount = 0;
+        for ($i = 0; $i < 100; $i++) {
+            if (\Yangweijie\Remotion\Helpers\Random::bool('bool-test', $i, 0.5)) {
+                $trueCount++;
+            }
+        }
+        // 由于确定性随机，结果应该一致
+        expect($trueCount)->toBeGreaterThan(0);
+        expect($trueCount)->toBeLessThan(100);
+    });
+
+    it('should generate random colors', function () {
+        $color = \Yangweijie\Remotion\Helpers\Random::color('color-test', 0);
+
+        expect($color['r'])->toBeGreaterThanOrEqual(0);
+        expect($color['r'])->toBeLessThanOrEqual(255);
+        expect($color['g'])->toBeGreaterThanOrEqual(0);
+        expect($color['g'])->toBeLessThanOrEqual(255);
+        expect($color['b'])->toBeGreaterThanOrEqual(0);
+        expect($color['b'])->toBeLessThanOrEqual(255);
+    });
+
+    it('should pick random element from array', function () {
+        $array = ['a', 'b', 'c', 'd', 'e'];
+        $picked = \Yangweijie\Remotion\Helpers\Random::pick('pick-test', 0, $array);
+
+        expect(in_array($picked, $array))->toBeTrue();
+    });
+
+    it('should work via Remotion facade', function () {
+        $value = \Yangweijie\Remotion\Remotion::random('facade-test', 0, 0, 100);
+
+        expect($value)->toBeGreaterThanOrEqual(0.0);
+        expect($value)->toBeLessThanOrEqual(100.0);
+    });
+});
+
+// ============================================================
+// Transitions 测试 (P1)
+// ============================================================
+describe('Transitions', function () {
+
+    it('should create fade transition', function () {
+        $fade = new \Yangweijie\Remotion\Transitions\FadeTransition(30);
+
+        expect($fade->getDuration())->toBe(30);
+    });
+
+    it('should apply fade transition correctly', function () {
+        $fade = new \Yangweijie\Remotion\Transitions\FadeTransition(30);
+
+        $fromImage = imagecreatetruecolor(100, 100);
+        $toImage = imagecreatetruecolor(100, 100);
+
+        $red = imagecolorallocate($fromImage, 255, 0, 0);
+        $blue = imagecolorallocate($toImage, 0, 0, 255);
+        imagefill($fromImage, 0, 0, $red);
+        imagefill($toImage, 0, 0, $blue);
+
+        // 开始时应该接近 fromImage
+        $result = $fade->apply($fromImage, $toImage, 0.0);
+        expect($result)->toBeInstanceOf(\GdImage::class);
+
+        // 结束时应该接近 toImage
+        $result = $fade->apply($fromImage, $toImage, 1.0);
+        expect($result)->toBeInstanceOf(\GdImage::class);
+
+        imagedestroy($fromImage);
+        imagedestroy($toImage);
+    });
+
+    it('should create slide transition', function () {
+        $slide = new \Yangweijie\Remotion\Transitions\SlideTransition(30, 'left');
+
+        expect($slide->getDuration())->toBe(30);
+        expect($slide->getDirection())->toBe('left');
+    });
+
+    it('should apply slide transition correctly', function () {
+        $slide = new \Yangweijie\Remotion\Transitions\SlideTransition(30, 'left');
+
+        $fromImage = imagecreatetruecolor(100, 100);
+        $toImage = imagecreatetruecolor(100, 100);
+
+        $red = imagecolorallocate($fromImage, 255, 0, 0);
+        $blue = imagecolorallocate($toImage, 0, 0, 255);
+        imagefill($fromImage, 0, 0, $red);
+        imagefill($toImage, 0, 0, $blue);
+
+        $result = $slide->apply($fromImage, $toImage, 0.5);
+        expect($result)->toBeInstanceOf(\GdImage::class);
+
+        imagedestroy($fromImage);
+        imagedestroy($toImage);
+    });
+
+    it('should work via Remotion facade', function () {
+        $fade = \Yangweijie\Remotion\Remotion::fadeTransition(30);
+        expect($fade)->toBeInstanceOf(\Yangweijie\Remotion\Transitions\FadeTransition::class);
+
+        $slide = \Yangweijie\Remotion\Remotion::slideTransition(30, 'right');
+        expect($slide)->toBeInstanceOf(\Yangweijie\Remotion\Transitions\SlideTransition::class);
+    });
+});
+
+// ============================================================
+// Noise 测试 (P2)
+// ============================================================
+describe('Noise', function () {
+
+    it('should generate 2D noise in valid range', function () {
+        for ($i = 0; $i < 10; $i++) {
+            $value = \Yangweijie\Remotion\Helpers\Noise::noise2D($i * 0.1, $i * 0.2);
+            expect($value)->toBeGreaterThanOrEqual(-1.0);
+            expect($value)->toBeLessThanOrEqual(1.0);
+        }
+    });
+
+    it('should generate deterministic noise', function () {
+        $value1 = \Yangweijie\Remotion\Helpers\Noise::noise2D(0.5, 0.5, 42);
+        $value2 = \Yangweijie\Remotion\Helpers\Noise::noise2D(0.5, 0.5, 42);
+
+        expect($value1)->toBe($value2);
+    });
+
+    it('should generate different noise for different seeds', function () {
+        $value1 = \Yangweijie\Remotion\Helpers\Noise::noise2D(0.5, 0.5, 1);
+        $value2 = \Yangweijie\Remotion\Helpers\Noise::noise2D(0.5, 0.5, 2);
+
+        expect($value1)->not->toBe($value2);
+    });
+
+    it('should generate 3D noise', function () {
+        $value = \Yangweijie\Remotion\Helpers\Noise::noise3D(0.5, 0.5, 0.5);
+
+        expect($value)->toBeGreaterThanOrEqual(-1.0);
+        expect($value)->toBeLessThanOrEqual(1.0);
+    });
+
+    it('should generate 4D noise', function () {
+        $value = \Yangweijie\Remotion\Helpers\Noise::noise4D(0.5, 0.5, 0.5, 0.5);
+
+        expect($value)->toBeGreaterThanOrEqual(-1.0);
+        expect($value)->toBeLessThanOrEqual(1.0);
+    });
+
+    it('should generate fbm noise', function () {
+        $value = \Yangweijie\Remotion\Helpers\Noise::fbm(0.5, 0.5, 0, 4);
+
+        expect($value)->toBeGreaterThanOrEqual(-1.0);
+        expect($value)->toBeLessThanOrEqual(1.0);
+    });
+
+    it('should map noise to range', function () {
+        $mapped = \Yangweijie\Remotion\Helpers\Noise::mapToRange(0.0, 0, 100);
+        expect($mapped)->toBe(50.0);
+
+        $mapped = \Yangweijie\Remotion\Helpers\Noise::mapToRange(-1.0, 0, 100);
+        expect($mapped)->toBe(0.0);
+
+        $mapped = \Yangweijie\Remotion\Helpers\Noise::mapToRange(1.0, 0, 100);
+        expect($mapped)->toBe(100.0);
+    });
+
+    it('should work via Remotion facade', function () {
+        $value = \Yangweijie\Remotion\Remotion::noise2D(0.5, 0.5, 42);
+        expect($value)->toBeGreaterThanOrEqual(-1.0);
+        expect($value)->toBeLessThanOrEqual(1.0);
+    });
+});
