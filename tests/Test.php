@@ -1708,3 +1708,514 @@ describe('Noise', function () {
         expect($value)->toBeLessThanOrEqual(1.0);
     });
 });
+
+// ============================================================
+// FrameCache 测试
+// ============================================================
+describe('FrameCache', function () {
+
+    it('should create with valid capacity', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(30);
+        expect($cache->getCapacity())->toBe(30);
+        expect($cache->getSize())->toBe(0);
+    });
+
+    it('should throw on invalid capacity', function () {
+        expect(fn () => new \Yangweijie\Remotion\Core\FrameCache(0))
+            ->toThrow(\InvalidArgumentException::class);
+    });
+
+    it('should store and retrieve frame', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $image = imagecreatetruecolor(100, 100);
+
+        $cache->put(5, $image);
+
+        expect($cache->has(5))->toBeTrue();
+        expect($cache->getSize())->toBe(1);
+    });
+
+    it('should use renderer when frame not in cache', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $rendererCalled = false;
+
+        $image = $cache->get(5, function ($frame) use (&$rendererCalled) {
+            $rendererCalled = true;
+            return imagecreatetruecolor(100, 100);
+        });
+
+        expect($rendererCalled)->toBeTrue();
+        expect($image)->toBeInstanceOf(\GdImage::class);
+    });
+
+    it('should cache hit on second access', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $callCount = 0;
+
+        $renderer = function ($frame) use (&$callCount) {
+            $callCount++;
+            return imagecreatetruecolor(100, 100);
+        };
+
+        $cache->get(5, $renderer);
+        $cache->get(5, $renderer);
+
+        expect($callCount)->toBe(1);
+        $stats = $cache->getStats();
+        expect($stats['hits'])->toBe(1);
+        expect($stats['misses'])->toBe(1);
+    });
+
+    it('should evict LRU when full', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(2);
+
+        $cache->put(1, imagecreatetruecolor(100, 100));
+        $cache->put(2, imagecreatetruecolor(100, 100));
+        $cache->put(3, imagecreatetruecolor(100, 100)); // Should evict frame 1
+
+        expect($cache->has(1))->toBeFalse();
+        expect($cache->has(2))->toBeTrue();
+        expect($cache->has(3))->toBeTrue();
+    });
+
+    it('should remove specific frame', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $cache->put(5, imagecreatetruecolor(100, 100));
+
+        $result = $cache->remove(5);
+
+        expect($result)->toBeTrue();
+        expect($cache->has(5))->toBeFalse();
+    });
+
+    it('should return false when removing non-existent frame', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $result = $cache->remove(999);
+        expect($result)->toBeFalse();
+    });
+
+    it('should clear all frames', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $cache->put(1, imagecreatetruecolor(100, 100));
+        $cache->put(2, imagecreatetruecolor(100, 100));
+
+        $cache->clear();
+
+        expect($cache->getSize())->toBe(0);
+        expect($cache->has(1))->toBeFalse();
+    });
+
+    it('should report correct stats', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+
+        $renderer = fn ($f) => imagecreatetruecolor(100, 100);
+        $cache->get(1, $renderer);
+        $cache->get(1, $renderer);
+        $cache->get(2, $renderer);
+
+        $stats = $cache->getStats();
+        expect($stats['capacity'])->toBe(10);
+        expect($stats['currentSize'])->toBe(2);
+        expect($stats['hits'])->toBe(1);
+        expect($stats['misses'])->toBe(2);
+    });
+
+    it('should reset stats', function () {
+        $cache = new \Yangweijie\Remotion\Core\FrameCache(10);
+        $renderer = fn ($f) => imagecreatetruecolor(100, 100);
+        $cache->get(1, $renderer);
+
+        $cache->resetStats();
+
+        $stats = $cache->getStats();
+        expect($stats['hits'])->toBe(0);
+        expect($stats['misses'])->toBe(0);
+    });
+});
+
+// ============================================================
+// CancellationToken 测试
+// ============================================================
+describe('CancellationToken', function () {
+
+    it('should not be cancelled by default', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        expect($token->isCancelled())->toBeFalse();
+    });
+
+    it('should be cancelled after cancel()', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        $token->cancel();
+        expect($token->isCancelled())->toBeTrue();
+    });
+
+    it('should store cancel reason', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        $token->cancel('Test reason');
+        expect($token->getReason())->toBe('Test reason');
+    });
+
+    it('should throw when cancelled', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        $token->cancel('Cancelled');
+
+        expect(fn () => $token->throwIfCancelled())
+            ->toThrow(\Yangweijie\Remotion\Core\RenderCancelledException::class);
+    });
+
+    it('should not throw when not cancelled', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        expect(fn () => $token->throwIfCancelled())->not->toThrow(\Exception::class);
+    });
+
+    it('should call listener on cancel', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        $listenerCalled = false;
+        $receivedReason = null;
+
+        $token->registerListener(function ($reason) use (&$listenerCalled, &$receivedReason) {
+            $listenerCalled = true;
+            $receivedReason = $reason;
+        });
+
+        $token->cancel('Test');
+
+        expect($listenerCalled)->toBeTrue();
+        expect($receivedReason)->toBe('Test');
+    });
+
+    it('should unregister listener', function () {
+        $token = new \Yangweijie\Remotion\Core\CancellationToken();
+        $callCount = 0;
+
+        $id = $token->registerListener(fn () => $callCount++);
+        $token->unregisterListener($id);
+        $token->cancel();
+
+        expect($callCount)->toBe(0);
+    });
+
+    it('should cancel linked token', function () {
+        $tokenA = new \Yangweijie\Remotion\Core\CancellationToken();
+        $linked = \Yangweijie\Remotion\Core\CancellationToken::linked([$tokenA]);
+
+        $tokenA->cancel('Source cancelled');
+
+        expect($linked->isCancelled())->toBeTrue();
+        expect($linked->getReason())->toBe('Source cancelled');
+    });
+});
+
+// ============================================================
+// CompositionRegistry 测试
+// ============================================================
+describe('CompositionRegistry', function () {
+
+    beforeEach(function () {
+        \Yangweijie\Remotion\Core\CompositionRegistry::clear();
+    });
+
+    it('should register and retrieve composition', function () {
+        $comp = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp);
+        $retrieved = \Yangweijie\Remotion\Core\CompositionRegistry::get('test');
+
+        expect($retrieved)->toBe($comp);
+    });
+
+    it('should return null for non-existent composition', function () {
+        $result = \Yangweijie\Remotion\Core\CompositionRegistry::get('non-existent');
+        expect($result)->toBeNull();
+    });
+
+    it('should check existence', function () {
+        $comp = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp);
+
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::has('test'))->toBeTrue();
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::has('missing'))->toBeFalse();
+    });
+
+    it('should work with namespaces', function () {
+        $comp1 = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+        $comp2 = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp1, 'namespace1');
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp2, 'namespace2');
+
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::get('test', 'namespace1'))->toBe($comp1);
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::get('test', 'namespace2'))->toBe($comp2);
+    });
+
+    it('should set active namespace', function () {
+        $comp = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::setActiveNamespace('myproject');
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp);
+
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::get('test'))->toBe($comp);
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::clearActiveNamespace();
+    });
+
+    it('should move composition between namespaces', function () {
+        $comp = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp, 'source');
+        \Yangweijie\Remotion\Core\CompositionRegistry::move('test', 'source', 'target');
+
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::has('test', 'source'))->toBeFalse();
+        expect(\Yangweijie\Remotion\Core\CompositionRegistry::has('test', 'target'))->toBeTrue();
+    });
+
+    it('should return stats', function () {
+        $comp = \Yangweijie\Remotion\Core\Composition::fromClosure(
+            'test',
+            fn () => imagecreatetruecolor(100, 100),
+            60, 30, 640, 480
+        );
+
+        \Yangweijie\Remotion\Core\CompositionRegistry::register($comp, 'test-ns');
+        $stats = \Yangweijie\Remotion\Core\CompositionRegistry::getStats();
+
+        expect($stats['totalNamespaces'])->toBeGreaterThan(0);
+        expect($stats['namespaces']['test-ns']['compositionCount'])->toBe(1);
+    });
+});
+
+// ============================================================
+// Preset 测试
+// ============================================================
+describe('Preset', function () {
+
+    it('should create custom preset', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::create(1920, 1080, 30, 90);
+
+        expect($preset->width)->toBe(1920);
+        expect($preset->height)->toBe(1080);
+        expect($preset->fps)->toBe(30);
+        expect($preset->durationInFrames)->toBe(90);
+    });
+
+    it('should provide 1080p preset', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_1080P();
+
+        expect($preset->width)->toBe(1920);
+        expect($preset->height)->toBe(1080);
+        expect($preset->fps)->toBe(30);
+    });
+
+    it('should provide 4K preset', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::UHD_4K();
+
+        expect($preset->width)->toBe(3840);
+        expect($preset->height)->toBe(2160);
+    });
+
+    it('should provide story preset', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::STORY_1080P();
+
+        expect($preset->width)->toBe(1080);
+        expect($preset->height)->toBe(1920);
+    });
+
+    it('should provide square preset', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::SQUARE_1080P();
+
+        expect($preset->width)->toBe(1080);
+        expect($preset->height)->toBe(1080);
+    });
+
+    it('should convert to array', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_720P();
+        $arr = $preset->toArray();
+
+        expect($arr['width'])->toBe(1280);
+        expect($arr['height'])->toBe(720);
+        expect($arr['fps'])->toBe(30);
+    });
+
+    it('should convert to VideoConfig', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_1080P(120);
+        $config = $preset->toVideoConfig();
+
+        expect($config)->toBeInstanceOf(\Yangweijie\Remotion\Core\VideoConfig::class);
+        expect($config->width)->toBe(1920);
+        expect($config->durationInFrames)->toBe(120);
+    });
+
+    it('should modify properties', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_1080P()
+            ->withFps(60)
+            ->withDuration(180);
+
+        expect($preset->fps)->toBe(60);
+        expect($preset->durationInFrames)->toBe(180);
+    });
+
+    it('should scale dimensions', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_1080P()->scale(0.5);
+
+        expect($preset->width)->toBe(960);
+        expect($preset->height)->toBe(540);
+    });
+
+    it('should calculate aspect ratio', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_1080P();
+
+        expect($preset->getAspectRatio())->toBe(16.0 / 9.0);
+        expect($preset->getAspectRatioString())->toBe('16:9');
+    });
+
+    it('should calculate duration in seconds', function () {
+        $preset = \Yangweijie\Remotion\Core\Preset::HD_1080P(60);
+
+        expect($preset->getDurationSeconds())->toBe(2.0);
+    });
+
+    it('should provide social media presets', function () {
+        expect(\Yangweijie\Remotion\Core\Preset::YOUTUBE()->width)->toBe(1920);
+        expect(\Yangweijie\Remotion\Core\Preset::TIKTOK()->width)->toBe(1080);
+        expect(\Yangweijie\Remotion\Core\Preset::INSTAGRAM()->width)->toBe(1080);
+    });
+});
+
+// ============================================================
+// RenderContext 增强测试
+// ============================================================
+describe('RenderContext Enhanced', function () {
+
+    it('should interpolate values', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(50, $config);
+
+        $result = $ctx->interpolate([0, 100], [0, 100]);
+
+        expect($result)->toBe(50.0);
+    });
+
+    it('should interpolate colors', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(50, $config);
+
+        $color = $ctx->interpolateColors([0, 100], [[255, 0, 0], [0, 0, 255]]);
+
+        expect($color[0])->toBe(128);
+        expect($color[1])->toBe(0);
+    });
+
+    it('should calculate spring animation', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(30, $config);
+
+        $result = $ctx->spring(['from' => 0, 'to' => 100]);
+
+        expect($result)->toBeGreaterThan(0);
+        // 弹簧可能过冲，所以允许略高于目标值
+        expect($result)->toBeLessThanOrEqual(120);
+    });
+
+    it('should calculate relative progress', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(50, $config);
+
+        $progress = $ctx->getRelativeProgress(0, 100);
+
+        expect($progress)->toBe(0.5);
+    });
+
+    it('should animate with range', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(50, $config);
+
+        $value = $ctx->animate(25, 50, 0, 100);
+
+        expect($value)->toBe(50.0);
+    });
+
+    it('should return null for animate outside range', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(10, $config);
+
+        $value = $ctx->animate(25, 50, 0, 100);
+
+        expect($value)->toBeNull();
+    });
+
+    it('should fade in', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(15, $config);
+
+        $opacity = $ctx->fadeIn(0, 30);
+
+        expect($opacity)->toBeGreaterThan(0);
+        expect($opacity)->toBeLessThanOrEqual(1.0);
+    });
+
+    it('should fade out', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(85, $config);
+
+        $opacity = $ctx->fadeOut(70, 30);
+
+        expect($opacity)->toBeGreaterThanOrEqual(0);
+        expect($opacity)->toBeLessThan(1.0);
+    });
+
+    it('should scale', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(50, $config);
+
+        $scale = $ctx->scale(25, 50, 0.5, 1.5);
+
+        expect($scale)->toBe(1.0);
+    });
+
+    it('should rotate', function () {
+        $config = new \Yangweijie\Remotion\Core\VideoConfig(100, 30, 1920, 1080);
+        $ctx = new \Yangweijie\Remotion\Core\RenderContext(50, $config);
+
+        $angle = $ctx->rotate(25, 50, 0, 360);
+
+        expect($angle)->toBe(180.0);
+    });
+
+    it('should provide easing functions', function () {
+        expect(\Yangweijie\Remotion\Core\RenderContext::easeIn()(0.5))->toBeLessThan(0.5);
+        expect(\Yangweijie\Remotion\Core\RenderContext::easeOut()(0.5))->toBeGreaterThan(0.5);
+        expect(\Yangweijie\Remotion\Core\RenderContext::linear()(0.5))->toBe(0.5);
+    });
+
+    it('should provide bezier easing', function () {
+        $bezier = \Yangweijie\Remotion\Core\RenderContext::bezier(0.25, 0.1, 0.25, 1.0);
+
+        expect($bezier(0.0))->toBe(0.0);
+        expect($bezier(1.0))->toBe(1.0);
+    });
+});

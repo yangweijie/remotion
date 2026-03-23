@@ -36,6 +36,9 @@ class Composition
     /** @var array<int, Sequence> 子序列列表 */
     private array $sequences = [];
 
+    /** @var CompositionConfig|null 可序列化配置（用于并行渲染） */
+    private ?CompositionConfig $config = null;
+
     public function __construct(
         public readonly string $id,
         private readonly ComponentInterface $component,
@@ -200,6 +203,39 @@ class Composition
     public function getSequences(): array
     {
         return $this->sequences;
+    }
+
+    /**
+     * 获取合成ID
+     */
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    /**
+     * 设置可序列化配置
+     */
+    public function setConfig(CompositionConfig $config): self
+    {
+        $this->config = $config;
+        return $this;
+    }
+
+    /**
+     * 获取可序列化配置
+     */
+    public function getConfig(): ?CompositionConfig
+    {
+        return $this->config;
+    }
+
+    /**
+     * 检查是否支持并行渲染
+     */
+    public function isParallelizable(): bool
+    {
+        return $this->config !== null;
     }
 
     /**

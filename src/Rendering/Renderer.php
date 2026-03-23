@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Yangweijie\Remotion\Rendering;
 
 use Yangweijie\Remotion\Contracts\RendererInterface;
+use Yangweijie\Remotion\Core\CancellationToken;
 use Yangweijie\Remotion\Core\Composition;
+use Yangweijie\Remotion\Core\FrameCache;
+use Yangweijie\Remotion\Core\RenderCancelledException;
 use Yangweijie\Remotion\Core\RenderContext;
 use Yangweijie\Remotion\Core\VideoConfig;
 use GifCreator\GifCreator;
@@ -16,8 +19,9 @@ use Grafika\Grafika;
  *
  * 主渲染器，负责将 Composition 渲染为 GIF 动画或图像序列。
  * 整合 FrameRenderer（单帧渲染）和 GifEncoder（GIF 编码）。
- * 
+ *
  * 支持 Grafika 抽象层（自动检测 GD 或 Imagick）
+ * 支持帧缓存 (LRU) 和取消令牌
  *
  * 使用示例：
  * ```php
@@ -30,6 +34,20 @@ class Renderer implements RendererInterface
 {
     /** @var callable|null */
     private $onProgress = null;
+
+    /** @var FrameCache|null */
+    private ?FrameCache $frameCache = null;
+
+    /** @var CancellationToken|null */
+    private ?CancellationToken $cancellationToken = null;
+
+    /** @var array 质量配置 */
+    private array $quality = [
+        'jpeg' => 95,      // JPEG 质量 (0-100)
+        'png'  => -1,      // PNG 压缩级别 (-1 = 默认, 0-9)
+        'webp' => 80,      // WebP 质量 (0-100)
+        'avif' => 80,      // AVIF 质量 (0-100)
+    ];
 
     public function __construct(
         private readonly Composition $composition,
@@ -47,11 +65,135 @@ class Renderer implements RendererInterface
     }
 
     /**
+     * 启用帧缓存
+     *
+     * @param int $capacity 缓存容量（默认30帧）
+     */
+    public function withCache(int $capacity = 30): self
+    {
+        $this->frameCache = new FrameCache($capacity);
+        return $this;
+    }
+
+    /**
+     * 设置取消令牌
+     */
+    public function withCancellation(CancellationToken $token): self
+    {
+        $this->cancellationToken = $token;
+        return $this;
+    }
+
+    /**
+     * 获取帧缓存实例
+     */
+    public function getFrameCache(): ?FrameCache
+    {
+        return $this->frameCache;
+    }
+
+    /**
+     * 设置 JPEG 质量
+     *
+     * @param int $quality 质量 (0-100，默认 95)
+     */
+    public function withJpegQuality(int $quality): self
+    {
+        $this->quality['jpeg'] = max(0, min(100, $quality));
+        return $this;
+    }
+
+    /**
+     * 设置 PNG 压缩级别
+     *
+     * @param int $level 压缩级别 (-1=默认, 0=无压缩, 9=最大压缩)
+     */
+    public function withPngCompression(int $level): self
+    {
+        $this->quality['png'] = max(-1, min(9, $level));
+        return $this;
+    }
+
+    /**
+     * 设置 WebP 质量
+     *
+     * @param int $quality 质量 (0-100，默认 80)
+     */
+    public function withWebpQuality(int $quality): self
+    {
+        $this->quality['webp'] = max(0, min(100, $quality));
+        return $this;
+    }
+
+    /**
+     * 设置 AVIF 质量
+     *
+     * @param int $quality 质量 (0-100，默认 80)
+     */
+    public function withAvifQuality(int $quality): self
+    {
+        $this->quality['avif'] = max(0, min(100, $quality));
+        return $this;
+    }
+
+    /**
+     * 批量设置质量参数
+     *
+     * @param array{
+     *     jpeg?: int,
+     *     png?: int,
+     *     webp?: int,
+     *     avif?: int,
+     * } $quality
+     */
+    public function withQuality(array $quality): self
+    {
+        if (isset($quality['jpeg'])) {
+            $this->withJpegQuality($quality['jpeg']);
+        }
+        if (isset($quality['png'])) {
+            $this->withPngCompression($quality['png']);
+        }
+        if (isset($quality['webp'])) {
+            $this->withWebpQuality($quality['webp']);
+        }
+        if (isset($quality['avif'])) {
+            $this->withAvifQuality($quality['avif']);
+        }
+        return $this;
+    }
+
+    /**
+     * 获取当前质量配置
+     */
+    public function getQuality(): array
+    {
+        return $this->quality;
+    }
+
+    /**
      * 渲染单帧（实现 RendererInterface）
      */
     public function renderFrame(RenderContext $ctx): \GdImage
     {
         return $this->composition->renderFrame($ctx->frame, $ctx->props);
+    }
+
+    /**
+     * 渲染指定帧（带缓存支持）
+     */
+    public function renderFrameWithCache(int $frame, array $props = []): \GdImage
+    {
+        // 检查取消令牌
+        $this->cancellationToken?->throwIfCancelled();
+
+        if ($this->frameCache !== null) {
+            return $this->frameCache->get($frame, function ($f) use ($props) {
+                return $this->composition->renderFrame($f, $props);
+            });
+        }
+
+        return $this->composition->renderFrame($frame, $props);
     }
 
     /**
@@ -68,6 +210,7 @@ class Renderer implements RendererInterface
      *
      * @param string $outputPath 输出路径（含 .gif 后缀）
      * @param array  $props      运行时 Props（覆盖 defaultProps）
+     * @throws RenderCancelledException
      */
     public function renderToGif(string $outputPath, array $props = []): bool
     {
@@ -84,7 +227,10 @@ class Renderer implements RendererInterface
         echo "Rendering {$totalFrames} frames...\n";
 
         for ($frame = 0; $frame < $totalFrames; $frame++) {
-            $image = $this->composition->renderFrame($frame, $props);
+            // 检查取消令牌
+            $this->cancellationToken?->throwIfCancelled();
+
+            $image = $this->renderFrameWithCache($frame, $props);
 
             // 将 GD 图像转换为 GIF 字节流
             ob_start();
@@ -94,12 +240,18 @@ class Renderer implements RendererInterface
             $frames[]  = $gifData;
             $delays[]  = $delayCs;
 
-            imagedestroy($image);
+            // 如果启用了缓存，不要在这里销毁图像（缓存会管理）
+            if ($this->frameCache === null) {
+                imagedestroy($image);
+            }
 
             if ($this->onProgress) {
                 ($this->onProgress)($frame + 1, $totalFrames);
             }
         }
+
+        // 清空缓存（因为 GIF 需要重新读取图像数据）
+        $this->frameCache?->clear();
 
         // 使用修复后的 GifCreator（PHP 8.0+ 兼容）
         try {
@@ -133,6 +285,7 @@ class Renderer implements RendererInterface
      * @param string $outputDir 输出目录
      * @param string $format    图像格式：png|jpeg|gif
      * @param array  $props     运行时 Props
+     * @throws RenderCancelledException
      */
     public function renderToFrames(string $outputDir, string $format = 'png', array $props = []): bool
     {
@@ -145,23 +298,41 @@ class Renderer implements RendererInterface
         echo "Rendering {$totalFrames} frames to {$outputDir}...\n";
 
         for ($frame = 0; $frame < $totalFrames; $frame++) {
-            $image    = $this->composition->renderFrame($frame, $props);
+            // 检查取消令牌
+            $this->cancellationToken?->throwIfCancelled();
+
+            $image    = $this->renderFrameWithCache($frame, $props);
             $filename = $outputDir . DIRECTORY_SEPARATOR
                       . str_pad((string) $frame, $padLen, '0', STR_PAD_LEFT)
                       . '.' . $format;
 
             match ($format) {
-                'jpeg', 'jpg' => imagejpeg($image, $filename, 95),
+                'jpeg', 'jpg' => imagejpeg($image, $filename, $this->quality['jpeg']),
                 'gif'         => imagegif($image, $filename),
+                'png'         => $this->quality['png'] >= 0
+                    ? imagepng($image, $filename, $this->quality['png'])
+                    : imagepng($image, $filename),
+                'webp'        => function_exists('imagewebp')
+                    ? imagewebp($image, $filename, $this->quality['webp'])
+                    : imagepng($image, $filename),
+                'avif'        => function_exists('imageavif')
+                    ? imageavif($image, $filename, $this->quality['avif'])
+                    : imagepng($image, $filename),
                 default       => imagepng($image, $filename),
             };
 
-            imagedestroy($image);
+            // 如果启用了缓存，不要在这里销毁图像（缓存会管理）
+            if ($this->frameCache === null) {
+                imagedestroy($image);
+            }
 
             if ($this->onProgress) {
                 ($this->onProgress)($frame + 1, $totalFrames);
             }
         }
+
+        // 清理缓存
+        $this->frameCache?->clear();
 
         echo "Done! Frames saved to: {$outputDir}\n";
         return true;
@@ -211,8 +382,17 @@ class Renderer implements RendererInterface
                       . '.' . $format;
 
             match ($format) {
-                'jpeg', 'jpg' => imagejpeg($image, $filename, 95),
+                'jpeg', 'jpg' => imagejpeg($image, $filename, $this->quality['jpeg']),
                 'gif'         => imagegif($image, $filename),
+                'png'         => $this->quality['png'] >= 0
+                    ? imagepng($image, $filename, $this->quality['png'])
+                    : imagepng($image, $filename),
+                'webp'        => function_exists('imagewebp')
+                    ? imagewebp($image, $filename, $this->quality['webp'])
+                    : imagepng($image, $filename),
+                'avif'        => function_exists('imageavif')
+                    ? imageavif($image, $filename, $this->quality['avif'])
+                    : imagepng($image, $filename),
                 default       => imagepng($image, $filename),
             };
 
@@ -344,8 +524,9 @@ class Renderer implements RendererInterface
                     . '.%s';
                 
                 match ('%s') {
-                    'jpeg', 'jpg' => imagejpeg($image, $filename, 95),
+                    'jpeg', 'jpg' => imagejpeg($image, $filename, %d),
                     'gif'         => imagegif($image, $filename),
+                    'png'         => %d >= 0 ? imagepng($image, $filename, %d) : imagepng($image, $filename),
                     default       => imagepng($image, $filename),
                 };
                 
@@ -362,7 +543,9 @@ PHP;
             addslashes($outputDir),
             $padLen,
             $format,
-            $format
+            $this->quality['jpeg'],
+            $this->quality['png'],
+            $this->quality['png']
         );
     }
 
@@ -617,8 +800,17 @@ PHP;
         $image = $this->composition->renderFrame($frame, $props);
 
         $result = match ($format) {
-            'jpeg', 'jpg' => imagejpeg($image, $outputPath, 95),
+            'jpeg', 'jpg' => imagejpeg($image, $outputPath, $this->quality['jpeg']),
             'gif'         => imagegif($image, $outputPath),
+            'png'         => $this->quality['png'] >= 0
+                ? imagepng($image, $outputPath, $this->quality['png'])
+                : imagepng($image, $outputPath),
+            'webp'        => function_exists('imagewebp')
+                ? imagewebp($image, $outputPath, $this->quality['webp'])
+                : imagepng($image, $outputPath),
+            'avif'        => function_exists('imageavif')
+                ? imageavif($image, $outputPath, $this->quality['avif'])
+                : imagepng($image, $outputPath),
             default       => imagepng($image, $outputPath),
         };
 
