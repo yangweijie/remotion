@@ -14,6 +14,10 @@ PHP 版的 Remotion - 程序化视频/动画合成库。
 - **Layers** - 颜色层、渐变层、图片层、文字层
 - **Grafika 支持** - 支持 GD 和 Imagick 双后端图像处理
 - **GIF 优化** - 使用 gifsicle/ffmpeg 优化 GIF 文件大小
+- **🆕 帧缓存** - LRU 缓存机制，提升重复渲染性能
+- **🆕 取消机制** - 支持取消长时间渲染任务
+- **🆕 并行渲染** - 利用多进程并行渲染帧
+- **🆕 预设系统** - 快速创建常用分辨率配置
 
 ## 安装
 
@@ -42,11 +46,8 @@ $comp = Remotion::composition(
         // 创建画布
         $canvas = Remotion::createCanvas($config->width, $config->height, [20, 20, 50]);
         
-        // 淡入动画
-        $opacity = Remotion::interpolate($frame, [0, 30], [0.0, 1.0], [
-            'extrapolateLeft'  => 'clamp',
-            'extrapolateRight' => 'clamp',
-        ]);
+        // 淡入动画（使用 RenderContext 内置方法）
+        $opacity = $ctx->fadeIn(0, 30) ?? 1.0;
         
         // 绘制文字
         $textLayer = Remotion::textLayer('Hello, PHP!', [
@@ -67,9 +68,18 @@ $comp = Remotion::composition(
     height: 360,
 );
 
-// 渲染为 GIF
+// 渲染为 GIF（带帧缓存和取消令牌）
+$token = new \Yangweijie\Remotion\Core\CancellationToken();
+
 Remotion::registerRoot([$comp]);
-$renderer = Remotion::render($comp);
+$renderer = Remotion::render($comp)
+    ->withCache(30)                      // 启用帧缓存
+    ->withCancellation($token)            // 绑定取消令牌
+    ->withJpegQuality(95)                 // 设置 JPEG 质量
+    ->onProgress(function ($frame, $total) {
+        echo "进度: $frame/$total\n";
+    });
+
 $renderer->renderToGif('output.gif');
 
 // 使用优化渲染（推荐用于长视频）
@@ -302,6 +312,187 @@ $newCtx = $ctx->withProps(['title' => 'New Title']);
 $inRange = $ctx->isInRange(10, 30);
 ```
 
+### RenderContext 增强（🆕 新增）
+
+```php
+// 内置插值（基于当前帧）
+$value = $ctx->interpolate([0, 30], [0, 100]);
+$color = $ctx->interpolateColors([0, 60], [[255, 0, 0], [0, 0, 255]]);
+
+// 弹簧动画
+$scale = $ctx->spring(['from' => 0.5, 'to' => 1.0, 'stiffness' => 100]);
+
+// 相对进度
+$progress = $ctx->getRelativeProgress(0, 100); // 在 0-100 帧范围内的进度
+
+// 常用动画
+$opacity = $ctx->fadeIn(0, 30);        // 0-30帧淡入
+$opacity = $ctx->fadeOut(60, 30);      // 60-90帧淡出
+$scale    = $ctx->scale(0, 30, 0.5, 1.5); // 缩放
+$angle    = $ctx->rotate(0, 60, 0, 360);  // 旋转
+$offset   = $ctx->slideIn('left', 0, 30); // 从左侧滑入
+
+// 缓动函数快捷方式
+$easing = $ctx::easeIn();      // 缓入
+$easing = $ctx::easeOut();     // 缓出
+$easing = $ctx::easeInOut();   // 缓入缓出
+$easing = $ctx::linear();      // 线性
+$easing = $ctx::bezier(0.25, 0.1, 0.25, 1.0); // 贝塞尔
+$easing = $ctx::elastic(1);    // 弹性
+$easing = $ctx::bounce(1);     // 回弹
+```
+
+## 🆕 新功能
+
+### 帧缓存 (FrameCache)
+
+```php
+use Yangweijie\Remotion\Core\FrameCache;
+use Yangweijie\Remotion\Rendering\Renderer;
+
+// 在 Renderer 中启用缓存
+$renderer = new Renderer($composition);
+$renderer->withCache(capacity: 30);  // 缓存最近30帧
+
+// 渲染时自动使用缓存
+$renderer->renderToFrames($outputDir, 'png');
+
+// 查看缓存统计
+$stats = $renderer->getFrameCache()->getStats();
+echo "命中率: {$stats['hitRate']}%";  // 40%
+```
+
+### 取消机制 (CancellationToken)
+
+```php
+use Yangweijie\Remotion\Core\CancellationToken;
+use Yangweijie\Remotion\Core\RenderCancelledException;
+
+// 创建取消令牌
+$token = new CancellationToken();
+
+// 绑定到渲染器
+$renderer = new Renderer($composition);
+$renderer->withCancellation($token);
+
+// 在另一个线程/信号处理器中取消
+$token->cancel('用户取消');
+
+// 渲染时捕获取消异常
+try {
+    $renderer->renderToGif('output.gif');
+} catch (RenderCancelledException $e) {
+    echo "渲染已取消: {$e->getMessage()}";
+}
+
+// 超时取消
+$timeoutToken = CancellationToken::withTimeout(5.0); // 5秒超时
+```
+
+### 并行渲染 (ParallelRenderer)
+
+```php
+use Yangweijie\Remotion\Core\CompositionFactory;
+use Yangweijie\Remotion\Rendering\ParallelRenderer;
+
+// 使用工厂创建可并行渲染的合成
+$comp = CompositionFactory::createParallelizable(
+    id: 'parallel-demo',
+    template: 'text-fade',
+    config: ['text' => 'Hello World'],
+    durationInFrames: 120,
+    fps: 30,
+    width: 640,
+    height: 360,
+);
+
+// 并行渲染
+$renderer = new ParallelRenderer(workerCount: 4);
+$files = $renderer->renderToFrames(
+    $comp,
+    $outputDir,
+    'png',
+    onProgress: function ($completed, $total) {
+        echo "进度: $completed/$total\n";
+    }
+);
+```
+
+### 预设系统 (Preset)
+
+```php
+use Yangweijie\Remotion\Core\Preset;
+use Yangweijie\Remotion\Remotion;
+
+// 使用预设快速创建合成
+$preset = Preset::HD_1080P(durationInFrames: 90);
+// 或: Preset::UHD_4K(), Preset::HD_720P(), Preset::STORY_1080P() 等
+
+$comp = Remotion::composition(
+    id: 'my-video',
+    renderer: $renderer,
+    ...$preset->toArray(),  // 展开 width, height, fps, durationInFrames
+);
+
+// 修改预设
+$preset = Preset::HD_1080P()
+    ->withFps(60)
+    ->withDurationSeconds(3.0);
+
+// 社交媒体预设
+$preset = Preset::YOUTUBE();        // 1920x1080
+$preset = Preset::TIKTOK();         // 1080x1920
+$preset = Preset::INSTAGRAM();      // 1080x1080
+$preset = Preset::YOUTUBE_SHORTS(); // 1080x1920
+```
+
+### 命名空间隔离 (CompositionRegistry)
+
+```php
+use Yangweijie\Remotion\Core\CompositionRegistry;
+
+// 注册到特定命名空间
+CompositionRegistry::register($composition, 'project-a');
+CompositionRegistry::register($composition, 'project-b');
+
+// 从命名空间获取
+$comp = CompositionRegistry::get('my-video', 'project-a');
+
+// 设置当前活跃命名空间
+CompositionRegistry::setActiveNamespace('project-a');
+CompositionRegistry::register($composition);  // 自动注册到 project-a
+
+// 查看统计
+$stats = CompositionRegistry::getStats();
+```
+
+### 渲染质量控制
+
+```php
+use Yangweijie\Remotion\Rendering\Renderer;
+
+$renderer = new Renderer($composition);
+
+// 设置 JPEG 质量 (0-100，默认95)
+$renderer->withJpegQuality(90);
+
+// 设置 PNG 压缩级别 (-1=默认, 0=无压缩, 9=最大压缩)
+$renderer->withPngCompression(6);
+
+// 设置 WebP 质量
+$renderer->withWebpQuality(85);
+
+// 批量设置
+$renderer->withQuality([
+    'jpeg' => 90,
+    'png' => 6,
+    'webp' => 85,
+]);
+
+// 渲染
+$renderer->renderToFrames($outputDir, 'jpg');  // 使用90%质量
+```
+
 ## Grafika 支持
 
 PHP Remotion 支持 [Grafika](https://github.com/kosinix/grafika) 图像处理库，提供 GD 和 Imagick 双后端支持。
@@ -517,13 +708,8 @@ $comp = Remotion::composition(
         $frame  = $ctx->getCurrentFrame();
         $config = $ctx->getVideoConfig();
 
-        // 弹簧动画
-        $scale = Spring::spring($frame, $config->fps, [
-            'stiffness' => 100,
-            'damping'   => 12,
-            'from'      => 0.3,
-            'to'        => 1.0,
-        ]);
+        // 使用 RenderContext 内置 spring 方法
+        $scale = $ctx->spring(['from' => 0.3, 'to' => 1.0, 'stiffness' => 100]);
 
         $canvas = Remotion::createCanvas($config->width, $config->height);
 
@@ -621,6 +807,19 @@ php example.php spring-scale
 php example.php multi-sequence
 ```
 
+### 新增示例
+
+```bash
+# 帧缓存和取消机制演示
+php examples/cache-and-cancellation-demo.php
+
+# 并行渲染对比
+php examples/parallel-text-fade.php
+
+# RenderContext 增强功能
+php examples/enhanced-features-demo.php
+```
+
 ## 测试
 
 ```bash
@@ -645,39 +844,45 @@ php example.php multi-sequence
 | VideoConfig | 14 | 视频配置测试 |
 | RenderContext | 10 | 渲染上下文测试 |
 | Sequence | 12 | 序列组件测试 |
-| Grafika Layers | 12 | Grafika 图层测试 |
-| Remotion Grafika | 3 | Grafika 画布测试 |
-| Renderer Grafika | 6 | Grafika 渲染测试 |
-| Color Grafika | 4 | 颜色转换测试 |
-| GIF Optimization | 3 | GIF 优化测试 |
+| FrameCache | 11 | 帧缓存测试 🆕 |
+| CancellationToken | 9 | 取消令牌测试 🆕 |
+| CompositionRegistry | 8 | 命名空间隔离测试 🆕 |
+| Preset | 13 | 预设系统测试 🆕 |
+| RenderContext Enhanced | 13 | 增强功能测试 🆕 |
 
 ## 项目结构
 
 ```
 src/
-├── Animation/           # 动画相关
-│   ├── Easing.php       # 缓动函数
-│   ├── Interpolate.php  # 插值
-│   └── Spring.php       # 弹簧动画
-├── Core/               # 核心组件
-│   ├── Composition.php  # 合成
-│   ├── RenderContext.php # 渲染上下文
-│   ├── Sequence.php     # 序列
-│   ├── Timeline.php     # 时间线
-│   └── VideoConfig.php  # 视频配置
-├── Helpers/            # 辅助工具
-│   ├── Color.php        # 颜色工具
-│   └── Pipeline.php     # 管道
-├── Layers/             # 图层
+├── Animation/              # 动画相关
+│   ├── Easing.php          # 缓动函数
+│   ├── Interpolate.php     # 插值
+│   └── Spring.php          # 弹簧动画
+├── Core/                   # 核心组件
+│   ├── CancellationToken.php  # 🆕 取消令牌
+│   ├── Composition.php        # 合成
+│   ├── CompositionRegistry.php # 🆕 命名空间隔离
+│   ├── FrameCache.php         # 🆕 帧缓存
+│   ├── Preset.php             # 🆕 预设系统
+│   ├── RenderContext.php      # 渲染上下文
+│   ├── Sequence.php           # 序列
+│   ├── SequenceWithTransition.php # 🆕 过渡序列
+│   ├── Timeline.php           # 时间线
+│   └── VideoConfig.php        # 视频配置
+├── Helpers/                # 辅助工具
+│   ├── Color.php           # 颜色工具
+│   └── Pipeline.php        # 管道
+├── Layers/                 # 图层
 │   ├── AbstractLayer.php
 │   ├── ColorLayer.php
 │   ├── GradientLayer.php
 │   ├── ImageLayer.php
 │   └── TextLayer.php
-├── Rendering/          # 渲染器
+├── Rendering/              # 渲染器
 │   ├── AnimatedGifEncoder.php
+│   ├── ParallelRenderer.php   # 🆕 并行渲染
 │   └── Renderer.php
-└── Remotion.php        # 主入口
+└── Remotion.php            # 主入口
 ```
 
 ## License

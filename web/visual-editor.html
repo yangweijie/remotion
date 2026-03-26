@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHP Remotion - 可视化动画编辑器</title>
+    <link rel="stylesheet" href="visual-editor.css">
+</head>
+<body>
+    <div class="app">
+        <!-- 顶部工具栏 -->
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <h1>🎬 PHP Remotion 可视化编辑器</h1>
+            </div>
+            <div class="toolbar-center">
+                <button class="btn btn-primary" id="btn-preview">▶ 预览</button>
+                <button class="btn" id="btn-export">📥 导出PHP配置</button>
+                <button class="btn btn-danger" id="btn-clear">🗑 清空</button>
+            </div>
+            <div class="toolbar-right">
+                <select id="preset-select">
+                    <option value="">选择预设...</option>
+                    <option value="hd-1080p">1080p HD (1920x1080)</option>
+                    <option value="hd-720p">720p HD (1280x720)</option>
+                    <option value="story-1080p">竖屏 1080p (1080x1920)</option>
+                    <option value="square-1080p">方形 1080p (1080x1080)</option>
+                    <option value="sd-480p">480p SD (854x480)</option>
+                </select>
+            </div>
+        </header>
+
+        <!-- 主工作区 -->
+        <main class="workspace">
+            <!-- 左侧：图层和资源面板 -->
+            <aside class="panel panel-left">
+                <div class="panel-section">
+                    <h3>📁 图层类型</h3>
+                    <div class="layer-types">
+                        <div class="layer-type" data-type="color" draggable="true">
+                            <span class="icon">🎨</span>
+                            <span>纯色层</span>
+                        </div>
+                        <div class="layer-type" data-type="gradient" draggable="true">
+                            <span class="icon">🌈</span>
+                            <span>渐变层</span>
+                        </div>
+                        <div class="layer-type" data-type="text" draggable="true">
+                            <span class="icon">📝</span>
+                            <span>文字层</span>
+                        </div>
+                        <div class="layer-type" data-type="image" draggable="true">
+                            <span class="icon">🖼️</span>
+                            <span>图片层</span>
+                        </div>
+                        <div class="layer-type" data-type="shape" draggable="true">
+                            <span class="icon">⭕</span>
+                            <span>形状层</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>🎭 动画预设</h3>
+                    <div class="animation-presets">
+                        <div class="anim-preset" data-anim="fadeIn">淡入</div>
+                        <div class="anim-preset" data-anim="fadeOut">淡出</div>
+                        <div class="anim-preset" data-anim="slideInLeft">从左滑入</div>
+                        <div class="anim-preset" data-anim="slideInRight">从右滑入</div>
+                        <div class="anim-preset" data-anim="slideInTop">从上滑入</div>
+                        <div class="anim-preset" data-anim="slideInBottom">从下滑入</div>
+                        <div class="anim-preset" data-anim="scale">缩放</div>
+                        <div class="anim-preset" data-anim="rotate">旋转</div>
+                        <div class="anim-preset" data-anim="bounce">弹跳</div>
+                        <div class="anim-preset" data-anim="spring">弹簧</div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>📋 图层列表</h3>
+                    <div class="layer-list" id="layer-list">
+                        <!-- 动态生成的图层列表 -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 中间：预览和时间轴 -->
+            <section class="panel panel-center">
+                <!-- 预览区域 -->
+                <div class="preview-area">
+                    <div class="preview-container" id="preview-container">
+                        <canvas id="preview-canvas" width="640" height="360"></canvas>
+                    </div>
+                    <div class="preview-controls">
+                        <button class="btn-icon" id="btn-play">▶</button>
+                        <button class="btn-icon" id="btn-pause">⏸</button>
+                        <button class="btn-icon" id="btn-stop">⏹</button>
+                        <input type="range" id="timeline-scrubber" min="0" max="100" value="0">
+                        <span id="time-display">00:00 / 00:03</span>
+                    </div>
+                </div>
+
+                <!-- 时间轴区域 -->
+                <div class="timeline-area">
+                    <div class="timeline-header">
+                        <div class="timeline-scale" id="timeline-scale">
+                            <!-- 时间刻度 -->
+                        </div>
+                    </div>
+                    <div class="timeline-tracks" id="timeline-tracks">
+                        <!-- 动态生成的时间轴轨道 -->
+                    </div>
+                    <div class="timeline-playhead" id="playhead"></div>
+                </div>
+            </section>
+
+            <!-- 右侧：属性面板 -->
+            <aside class="panel panel-right">
+                <div class="panel-section" id="composition-settings">
+                    <h3>⚙️ 合成设置</h3>
+                    <div class="form-group">
+                        <label>宽度 (px)</label>
+                        <input type="number" id="comp-width" value="640" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>高度 (px)</label>
+                        <input type="number" id="comp-height" value="360" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>帧率 (fps)</label>
+                        <input type="number" id="comp-fps" value="30" min="1" max="60">
+                    </div>
+                    <div class="form-group">
+                        <label>总帧数</label>
+                        <input type="number" id="comp-duration" value="90" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>合成ID</label>
+                        <input type="text" id="comp-id" value="my-animation">
+                    </div>
+                </div>
+
+                <div class="panel-section" id="layer-properties" style="display: none;">
+                    <h3>🔧 图层属性</h3>
+                    <div id="layer-props-content">
+                        <!-- 动态生成的图层属性表单 -->
+                    </div>
+                </div>
+
+                <div class="panel-section" id="animation-properties" style="display: none;">
+                    <h3>✨ 动画属性</h3>
+                    <div id="anim-props-content">
+                        <!-- 动态生成的动画属性表单 -->
+                    </div>
+                    <button class="btn btn-secondary" id="btn-add-anim">+ 添加动画</button>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- 导出模态框 -->
+    <div class="modal" id="export-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>导出PHP配置</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>配置名称</label>
+                    <input type="text" id="export-name" value="my-animation-config">
+                </div>
+                <div class="form-group">
+                    <label>导出选项</label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="export-include-preview" checked>
+                        包含预览代码
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="export-include-comments" checked>
+                        包含注释说明
+                    </label>
+                </div>
+                <div class="code-preview">
+                    <pre id="php-code-preview"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" id="btn-copy-code">📋 复制代码</button>
+                <button class="btn btn-primary" id="btn-download">💾 下载PHP文件</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="visual-editor.js"></script>
+</body>
+</html>

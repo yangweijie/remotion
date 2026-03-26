@@ -12,9 +12,6 @@
       "src/helpers.php"
     ]
   },
-  "scripts": {
-    "post-autoload-dump": "php patch.php"
-  },
   "autoload-dev": {
     "psr-4": {
       "Yangweijie\\Remotion\\Tests\\": "tests/"
