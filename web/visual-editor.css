@@ -117,6 +117,20 @@ body {
     font-size: 16px;
 }
 
+/* 按钮禁用状态 */
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+.btn:disabled:hover {
+    background: var(--bg-tooltip);
+    border-color: var(--border-color);
+}
+
 /* 工作区布局 */
 .workspace {
     display: flex;
@@ -747,4 +761,218 @@ body {
         height: auto;
         max-height: 300px;
     }
+}
+
+/* 动画选择模态框 */
+.animation-modal-content {
+    max-width: 800px;
+    width: 90%;
+}
+
+.animation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    padding: 10px 0;
+}
+
+.animation-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.animation-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    background: var(--bg-hover);
+}
+
+.animation-card:active {
+    transform: translateY(0);
+}
+
+.animation-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.animation-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.animation-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* 右键菜单样式 */
+.context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    padding: 6px 0;
+    min-width: 200px;
+    z-index: 10000;
+    animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.context-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-primary);
+    font-size: 13px;
+    transition: all 0.15s ease;
+}
+
+.context-menu-item:hover {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.context-menu-item:active {
+    background: var(--accent-secondary);
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 0;
+}
+
+.context-menu-item .shortcut {
+    font-size: 11px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.context-menu-item:hover .shortcut {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* 错误提示样式 */
+.error-toast {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* 图层锁定按钮样式 */
+.lock-button {
+    width: 100%;
+    padding: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-align: center;
+    margin-top: 5px;
+}
+
+.lock-button:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.lock-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(233, 69, 96, 0.3);
+}
+
+.lock-button.locked {
+    background: var(--accent-primary);
+    border-color: var(--accent-secondary);
+    color: white;
+}
+
+.lock-button.locked:hover {
+    background: var(--accent-secondary);
+    border-color: var(--accent-primary);
+}
+
+/* 图层列表锁定图标 */
+.layer-lock-icon {
+    font-size: 14px;
+    margin-left: 4px;
+    opacity: 0.7;
+}
+
+.layer-item.locked {
+    opacity: 0.6;
+}
+
+.layer-item.locked:hover {
+    opacity: 0.8;
+}
+
+/* 工具栏分隔线 */
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    margin: 0 8px;
+}
+
+/* 对齐工具 */
+.alignment-tools {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 36px;
 }

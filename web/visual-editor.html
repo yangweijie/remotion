@@ -14,11 +14,28 @@
                 <h1>🎬 PHP Remotion 可视化编辑器</h1>
             </div>
             <div class="toolbar-center">
+                <button class="btn" id="btn-undo" disabled>↩ 撤销</button>
+                <button class="btn" id="btn-redo" disabled>↪ 重做</button>
+                <div class="toolbar-divider"></div>
+                <div class="alignment-tools">
+                    <button class="btn btn-sm" id="btn-align-left" title="左对齐">⬅ 左</button>
+                    <button class="btn btn-sm" id="btn-align-center" title="水平居中">↔ 居中</button>
+                    <button class="btn btn-sm" id="btn-align-right" title="右对齐">➡ 右</button>
+                    <button class="btn btn-sm" id="btn-align-top" title="顶对齐">⬆ 顶</button>
+                    <button class="btn btn-sm" id="btn-align-middle" title="垂直居中">↕ 居中</button>
+                    <button class="btn btn-sm" id="btn-align-bottom" title="底对齐">⬇ 底</button>
+                </div>
+                <div class="toolbar-divider"></div>
                 <button class="btn btn-primary" id="btn-preview">▶ 预览</button>
                 <button class="btn" id="btn-export">📥 导出PHP配置</button>
                 <button class="btn btn-danger" id="btn-clear">🗑 清空</button>
             </div>
             <div class="toolbar-right">
+                <button class="btn" id="btn-theme-toggle" title="切换主题">🌙</button>
+                <label class="btn" for="background-image-input" title="设置背景图片">
+                    🖼 背景图片
+                </label>
+                <input type="file" id="background-image-input" accept="image/*" style="display: none;">
                 <select id="preset-select">
                     <option value="">选择预设...</option>
                     <option value="hd-1080p">1080p HD (1920x1080)</option>
@@ -189,6 +206,89 @@
                 <button class="btn" id="btn-copy-code">📋 复制代码</button>
                 <button class="btn btn-primary" id="btn-download">💾 下载PHP文件</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 动画选择模态框 -->
+    <div id="animation-modal" class="modal" style="display: none;">
+        <div class="modal-content animation-modal-content">
+            <div class="modal-header">
+                <h3>添加动画</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="animation-grid">
+                    <div class="animation-card" data-type="fadeIn">
+                        <div class="animation-icon">🌟</div>
+                        <div class="animation-name">淡入</div>
+                        <div class="animation-desc">从透明到可见</div>
+                    </div>
+                    <div class="animation-card" data-type="fadeOut">
+                        <div class="animation-icon">🌙</div>
+                        <div class="animation-name">淡出</div>
+                        <div class="animation-desc">从可见到透明</div>
+                    </div>
+                    <div class="animation-card" data-type="slideInLeft">
+                        <div class="animation-icon">⬅️</div>
+                        <div class="animation-name">从左滑入</div>
+                        <div class="animation-desc">从左侧滑入</div>
+                    </div>
+                    <div class="animation-card" data-type="slideInRight">
+                        <div class="animation-icon">➡️</div>
+                        <div class="animation-name">从右滑入</div>
+                        <div class="animation-desc">从右侧滑入</div>
+                    </div>
+                    <div class="animation-card" data-type="slideInTop">
+                        <div class="animation-icon">⬆️</div>
+                        <div class="animation-name">从上滑入</div>
+                        <div class="animation-desc">从顶部滑入</div>
+                    </div>
+                    <div class="animation-card" data-type="slideInBottom">
+                        <div class="animation-icon">⬇️</div>
+                        <div class="animation-name">从下滑入</div>
+                        <div class="animation-desc">从底部滑入</div>
+                    </div>
+                    <div class="animation-card" data-type="scale">
+                        <div class="animation-icon">🔍</div>
+                        <div class="animation-name">缩放</div>
+                        <div class="animation-desc">从小到大缩放</div>
+                    </div>
+                    <div class="animation-card" data-type="rotate">
+                        <div class="animation-icon">🔄</div>
+                        <div class="animation-name">旋转</div>
+                        <div class="animation-desc">360度旋转</div>
+                    </div>
+                    <div class="animation-card" data-type="bounce">
+                        <div class="animation-icon">🏀</div>
+                        <div class="animation-name">弹跳</div>
+                        <div class="animation-desc">弹跳效果</div>
+                    </div>
+                    <div class="animation-card" data-type="spring">
+                        <div class="animation-icon">🎯</div>
+                        <div class="animation-name">弹簧</div>
+                        <div class="animation-desc">弹簧动画</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" id="context-menu-delete">
+            <span>🗑 删除图层</span>
+            <span class="shortcut">Delete</span>
+        </div>
+        <div class="context-menu-item" id="context-menu-duplicate">
+            <span>📋 复制图层</span>
+            <span class="shortcut">Ctrl+D</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" id="context-menu-bring-front">
+            <span>⬆ 置于顶层</span>
+        </div>
+        <div class="context-menu-item" id="context-menu-send-back">
+            <span>⬇ 置于底层</span>
         </div>
     </div>
 
